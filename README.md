@@ -2,9 +2,11 @@
 
 An intelligent security analysis tool that uses a multi-agent AI system to scan codebases for security vulnerabilities, missing controls, and best practice violations.
 
+[![GitHub](https://img.shields.io/badge/GitHub-kavienanj%2Fcode--scanner--ai-blue?logo=github)](https://github.com/kavienanj/code-scanner-ai)
 ![Next.js](https://img.shields.io/badge/Next.js-16-black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
 ![AI Powered](https://img.shields.io/badge/AI-Claude%20%7C%20GPT-purple)
+![License](https://img.shields.io/badge/License-MIT-green)
 
 ## Features
 
@@ -315,16 +317,22 @@ src/
 
 ## License
 
-This project is private and proprietary.
+This project is open source and available under the [MIT License](LICENSE).
 
 ---
 
 ## Contributing
 
-Contributions are welcome! Please open an issue or submit a pull request.
+Contributions are welcome! Please open an issue or submit a pull request on [GitHub](https://github.com/kavienanj/code-scanner-ai).
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
 3. Commit your changes (`git commit -m 'Add some amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+---
+
+## ⭐ Star History
+
+If you find this project useful, please consider giving it a star on [GitHub](https://github.com/kavienanj/code-scanner-ai)!
