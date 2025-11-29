@@ -5,12 +5,42 @@ import {
   updateStatus,
   setResult,
   setError,
+  setAbortController,
+  isJobCancelled,
   AnalysisResult,
 } from "./job-store";
+import { createSentinelAgent, EndpointProfile } from "./agents";
 
-// Helper to simulate async delay
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+// Custom error for cancellation
+class CancellationError extends Error {
+  constructor() {
+    super("Job was cancelled");
+    this.name = "CancellationError";
+  }
+}
+
+// Helper to simulate async delay with cancellation support
+function delay(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new CancellationError());
+      return;
+    }
+    
+    const timeout = setTimeout(resolve, ms);
+    
+    signal?.addEventListener("abort", () => {
+      clearTimeout(timeout);
+      reject(new CancellationError());
+    });
+  });
+}
+
+// Check if job should continue
+function checkCancellation(jobId: string, signal?: AbortSignal): void {
+  if (signal?.aborted || isJobCancelled(jobId)) {
+    throw new CancellationError();
+  }
 }
 
 /**
@@ -23,23 +53,30 @@ export async function runAnalysis(
   framework: FrameworkDetectionResult
 ): Promise<void> {
   const startTime = Date.now();
+  
+  // Create abort controller for this job
+  const abortController = new AbortController();
+  setAbortController(jobId, abortController);
+  const signal = abortController.signal;
 
   try {
     // Start the job
     updateStatus(jobId, "running");
     addLog(jobId, "info", "🚀 Starting code analysis...");
-    await delay(500);
+    await delay(500, signal);
 
     // Stage 1: Initialize
+    checkCancellation(jobId, signal);
     updateProgress(jobId, 5, 100, "Initializing analysis engine");
     addLog(jobId, "info", `📦 Detected framework: ${framework.framework}`);
     addLog(jobId, "info", `📊 Files to analyze: ${files.length}`);
-    await delay(800);
+    await delay(800, signal);
 
     // Stage 2: Parse files
+    checkCancellation(jobId, signal);
     updateProgress(jobId, 15, 100, "Parsing source files");
     addLog(jobId, "info", "🔍 Parsing source files...");
-    await delay(600);
+    await delay(600, signal);
 
     const fileTypes = new Map<string, number>();
     for (const file of files) {
@@ -48,48 +85,89 @@ export async function runAnalysis(
     }
 
     for (const [ext, count] of fileTypes) {
+      checkCancellation(jobId, signal);
       addLog(jobId, "info", `   Found ${count} .${ext} files`);
-      await delay(200);
+      await delay(200, signal);
     }
 
-    // Stage 3: Build dependency graph
-    updateProgress(jobId, 30, 100, "Building dependency graph");
-    addLog(jobId, "info", "🕸️ Building dependency graph...");
-    await delay(1000);
-    addLog(jobId, "success", "   Dependency graph constructed");
-    await delay(300);
+    // Stage 3: Sentinel Agent - Endpoint Tracing
+    checkCancellation(jobId, signal);
+    updateProgress(jobId, 20, 100, "Running Sentinel Agent");
+    addLog(jobId, "info", "🛡️ Starting Sentinel Agent for endpoint analysis...");
+    
+    let endpointProfiles: EndpointProfile[] = [];
+    try {
+      const sentinelAgent = createSentinelAgent({
+        saveDebugOutput: true,
+        onLog: (message) => {
+          addLog(jobId, "info", `   ${message}`);
+        },
+        abortSignal: signal,
+      });
+      
+      endpointProfiles = await sentinelAgent.analyze(files);
+      
+      addLog(jobId, "success", `   Sentinel Agent found ${endpointProfiles.length} endpoints`);
+      
+      for (const endpoint of endpointProfiles) {
+        addLog(
+          jobId,
+          "info",
+          `   📍 ${endpoint.entry_point} [${endpoint.sensitivity_level}] - ${endpoint.purpose}`
+        );
+      }
+    } catch (error) {
+      if (error instanceof CancellationError) {
+        throw error;
+      }
+      const errorMsg = error instanceof Error ? error.message : "Unknown error";
+      addLog(jobId, "warn", `   ⚠️ Sentinel Agent encountered an issue: ${errorMsg}`);
+      addLog(jobId, "info", "   Continuing with remaining analysis stages...");
+    }
 
-    // Stage 4: Analyze code patterns
-    updateProgress(jobId, 45, 100, "Analyzing code patterns");
+    // Stage 4: Build dependency graph
+    checkCancellation(jobId, signal);
+    updateProgress(jobId, 40, 100, "Building dependency graph");
+    addLog(jobId, "info", "🕸️ Building dependency graph...");
+    await delay(1000, signal);
+    addLog(jobId, "success", "   Dependency graph constructed");
+    await delay(300, signal);
+
+    // Stage 5: Analyze code patterns
+    checkCancellation(jobId, signal);
+    updateProgress(jobId, 50, 100, "Analyzing code patterns");
     addLog(jobId, "info", "🔬 Analyzing code patterns...");
-    await delay(800);
+    await delay(800, signal);
 
     // Simulate analyzing some files
     const filesToShow = files.slice(0, Math.min(5, files.length));
     for (let i = 0; i < filesToShow.length; i++) {
+      checkCancellation(jobId, signal);
       const file = filesToShow[i];
-      const progress = 45 + Math.floor((i / filesToShow.length) * 20);
+      const progress = 50 + Math.floor((i / filesToShow.length) * 15);
       updateProgress(jobId, progress, 100, `Analyzing ${file.path}`);
       addLog(jobId, "info", `   Analyzing: ${file.path}`);
-      await delay(400);
+      await delay(400, signal);
     }
 
     if (files.length > 5) {
       addLog(jobId, "info", `   ... and ${files.length - 5} more files`);
-      await delay(300);
+      await delay(300, signal);
     }
 
-    // Stage 5: Security scan
-    updateProgress(jobId, 70, 100, "Running security scan");
+    // Stage 6: Security scan
+    checkCancellation(jobId, signal);
+    updateProgress(jobId, 75, 100, "Running security scan");
     addLog(jobId, "info", "🔒 Running security scan...");
-    await delay(1200);
+    await delay(1200, signal);
     addLog(jobId, "success", "   No critical vulnerabilities found");
-    await delay(200);
+    await delay(200, signal);
 
-    // Stage 6: Code quality check
+    // Stage 7: Code quality check
+    checkCancellation(jobId, signal);
     updateProgress(jobId, 85, 100, "Checking code quality");
     addLog(jobId, "info", "✨ Checking code quality...");
-    await delay(800);
+    await delay(800, signal);
 
     // Generate some dummy findings
     const findings: AnalysisResult["findings"] = [];
@@ -118,19 +196,21 @@ export async function runAnalysis(
     });
 
     for (const finding of findings) {
+      checkCancellation(jobId, signal);
       const icon = finding.severity === "warning" ? "⚠️" : "ℹ️";
       addLog(
         jobId,
         finding.severity === "warning" ? "warn" : "info",
         `${icon} ${finding.message}`
       );
-      await delay(300);
+      await delay(300, signal);
     }
 
-    // Stage 7: Generate report
+    // Stage 8: Generate report
+    checkCancellation(jobId, signal);
     updateProgress(jobId, 95, 100, "Generating report");
     addLog(jobId, "info", "📝 Generating analysis report...");
-    await delay(600);
+    await delay(600, signal);
 
     // Complete
     updateProgress(jobId, 100, 100, "Complete");
@@ -140,8 +220,10 @@ export async function runAnalysis(
     const result: AnalysisResult = {
       summary: `Analysis completed successfully for ${framework.framework} project with ${files.length} files.`,
       findings,
+      endpointProfiles,
       metrics: {
         filesAnalyzed: files.length,
+        endpointsFound: endpointProfiles.length,
         issuesFound: findings.filter((f) => f.severity !== "info").length,
         analysisTime,
       },
@@ -156,6 +238,10 @@ export async function runAnalysis(
     updateStatus(jobId, "completed");
 
   } catch (error) {
+    if (error instanceof CancellationError) {
+      // Job was cancelled - status already updated by cancelJob
+      return;
+    }
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     addLog(jobId, "error", `❌ Analysis failed: ${errorMessage}`);
     setError(jobId, errorMessage);

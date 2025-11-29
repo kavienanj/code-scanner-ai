@@ -1,6 +1,7 @@
 import { FileEntry, FrameworkDetectionResult } from "./code-cleaner";
+import { EndpointProfile } from "./agents";
 
-export type JobStatus = "pending" | "running" | "completed" | "failed";
+export type JobStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
 
 export interface JobEvent {
   type: "log" | "progress" | "status" | "result" | "error";
@@ -22,8 +23,10 @@ export interface AnalysisResult {
     message: string;
     file?: string;
   }>;
+  endpointProfiles: EndpointProfile[];
   metrics: {
     filesAnalyzed: number;
+    endpointsFound: number;
     issuesFound: number;
     analysisTime: number;
   };
@@ -43,6 +46,8 @@ export interface Job {
   error?: string;
   // Subscribers for SSE
   subscribers: Set<(event: JobEvent) => void>;
+  // Abort controller for cancellation
+  abortController?: AbortController;
 }
 
 // In-memory job store
@@ -161,7 +166,7 @@ export function updateStatus(id: string, status: JobStatus): void {
   if (status === "running" && !job.startedAt) {
     job.startedAt = Date.now();
   }
-  if (status === "completed" || status === "failed") {
+  if (status === "completed" || status === "failed" || status === "cancelled") {
     job.completedAt = Date.now();
   }
 
@@ -170,6 +175,47 @@ export function updateStatus(id: string, status: JobStatus): void {
     timestamp: Date.now(),
     data: status,
   });
+}
+
+// Set abort controller for a job
+export function setAbortController(id: string, controller: AbortController): void {
+  const job = jobs.get(id);
+  if (!job) return;
+  job.abortController = controller;
+}
+
+// Cancel a running job
+export function cancelJob(id: string): boolean {
+  const job = jobs.get(id);
+  if (!job) return false;
+  
+  if (job.status !== "running" && job.status !== "pending") {
+    return false;
+  }
+
+  // Abort the controller if it exists
+  if (job.abortController) {
+    job.abortController.abort();
+  }
+
+  job.status = "cancelled";
+  job.completedAt = Date.now();
+
+  addLog(id, "warn", "🛑 Analysis cancelled by user");
+
+  emitEvent(job, {
+    type: "status",
+    timestamp: Date.now(),
+    data: "cancelled",
+  });
+
+  return true;
+}
+
+// Check if job is cancelled
+export function isJobCancelled(id: string): boolean {
+  const job = jobs.get(id);
+  return job?.status === "cancelled" || job?.abortController?.signal.aborted === true;
 }
 
 // Set job result

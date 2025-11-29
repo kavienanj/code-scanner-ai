@@ -34,7 +34,7 @@ interface AnalysisResult {
   };
 }
 
-type JobStatus = "pending" | "running" | "completed" | "failed";
+type JobStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
 
 export default function TaskPage() {
   const params = useParams();
@@ -51,6 +51,7 @@ export default function TaskPage() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const logsEndRef = useRef<HTMLDivElement>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -117,8 +118,30 @@ export default function TaskPage() {
         return "bg-green-500";
       case "failed":
         return "bg-red-500";
+      case "cancelled":
+        return "bg-orange-500";
       default:
         return "bg-zinc-500";
+    }
+  };
+
+  const handleCancelJob = async () => {
+    if (isCancelling) return;
+    
+    setIsCancelling(true);
+    try {
+      const response = await fetch(`/api/analyze/${taskId}/cancel`, {
+        method: "POST",
+      });
+      
+      if (!response.ok) {
+        const data = await response.json();
+        console.error("Failed to cancel job:", data.error);
+      }
+    } catch (error) {
+      console.error("Failed to cancel job:", error);
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -161,7 +184,7 @@ export default function TaskPage() {
 
         {/* Status Card */}
         <Card className="mb-6">
-          <CardHeader className="pb-3">
+          <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg">Status</CardTitle>
               <div className="flex items-center gap-2">
@@ -175,6 +198,17 @@ export default function TaskPage() {
                   <Badge variant="outline" className="ml-2 text-xs">
                     Live
                   </Badge>
+                )}
+                {(status === "running" || status === "pending") && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleCancelJob}
+                    disabled={isCancelling}
+                    className="ml-2"
+                  >
+                    {isCancelling ? "Cancelling..." : "Terminate"}
+                  </Button>
                 )}
               </div>
             </div>
@@ -196,7 +230,7 @@ export default function TaskPage() {
 
         {/* Logs Card */}
         <Card className="mb-6">
-          <CardHeader className="pb-3">
+          <CardHeader>
             <CardTitle className="text-lg">Logs</CardTitle>
             <CardDescription>Real-time analysis output</CardDescription>
           </CardHeader>
@@ -222,7 +256,7 @@ export default function TaskPage() {
         {/* Error Card */}
         {error && (
           <Card className="mb-6 border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950">
-            <CardHeader className="pb-3">
+            <CardHeader>
               <CardTitle className="text-lg text-red-800 dark:text-red-200">
                 Error
               </CardTitle>
@@ -233,10 +267,26 @@ export default function TaskPage() {
           </Card>
         )}
 
+        {/* Cancelled Card */}
+        {status === "cancelled" && (
+          <Card className="mb-6 border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950">
+            <CardHeader>
+              <CardTitle className="text-lg text-orange-800 dark:text-orange-200">
+                Analysis Cancelled
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-orange-700 dark:text-orange-300">
+                The analysis was terminated by user request.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Results Card */}
         {result && (
           <Card className="mb-6 border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950">
-            <CardHeader className="pb-3">
+            <CardHeader>
               <CardTitle className="text-lg text-green-800 dark:text-green-200">
                 Analysis Complete
               </CardTitle>
