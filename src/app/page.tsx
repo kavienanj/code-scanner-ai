@@ -121,10 +121,13 @@ export default function Home() {
       <main className="w-full max-w-2xl">
         <div className="mb-8 text-center">
           <h1 className="text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Code Scanner AI
+            🛡️ Code Scanner AI
           </h1>
           <p className="mt-2 text-lg text-zinc-600 dark:text-zinc-400">
-            Upload your codebase for intelligent analysis
+            AI-powered security analysis for your codebase
+          </p>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-500">
+            Powered by multi-agent AI • OWASP mapped • Framework aware
           </p>
         </div>
 
@@ -169,7 +172,15 @@ export default function Home() {
         </Card>
 
         <p className="mt-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
-          Your code is analyzed securely and never stored permanently
+          Your code is analyzed securely and never stored permanently •{" "}
+          <a
+            href="https://github.com/kavienanj/code-scanner-ai"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-zinc-700 dark:hover:text-zinc-300"
+          >
+            Open Source
+          </a>
         </p>
       </main>
     </div>
