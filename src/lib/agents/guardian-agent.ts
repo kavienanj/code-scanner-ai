@@ -1,4 +1,5 @@
 import { openai } from "@ai-sdk/openai";
+import { anthropic } from '@ai-sdk/anthropic';
 import { generateText } from "ai";
 import { promises as fs } from "fs";
 import path from "path";
@@ -11,7 +12,7 @@ import { FrameworkDetectionResult } from "../code-cleaner";
 /** Output directory for debug JSON files */
 export const GUARDIAN_OUTPUT_DIR = path.join(process.cwd(), "output", "guardian-agent");
 
-/** Default OpenAI model to use for the Guardian Agent */
+/** Default model to use for the Guardian Agent */
 export const GUARDIAN_DEFAULT_MODEL = "gpt-5.1-2025-11-13";
 
 /** Maximum retries for parsing agent response */
@@ -434,7 +435,9 @@ export class GuardianAgent {
       try {
         // Generate response from the agent
         const { text } = await generateText({
-          model: openai(this.model),
+          model: this.model.startsWith("claude-") 
+            ? anthropic(this.model)
+            : openai(this.model),
           system: GUARDIAN_SYSTEM_PROMPT,
           messages: conversationHistory,
           abortSignal: this.abortSignal,
@@ -454,7 +457,11 @@ export class GuardianAgent {
             retries,
             success: true,
           });
-          return response.result;
+          // Use original flow_name to ensure consistency with Sentinel Agent
+          return {
+            ...response.result,
+            flow_name: flow.flow_name,
+          };
         }
 
         if (response.status === "error") {

@@ -1,5 +1,5 @@
 import { FileEntry, FrameworkDetectionResult } from "./code-cleaner";
-import { EndpointProfile, SecurityChecklist } from "./agents";
+import { EndpointProfile, SecurityChecklist, SecurityReport } from "./agents";
 
 export type JobStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
 
@@ -25,10 +25,12 @@ export interface AnalysisResult {
   }>;
   endpointProfiles: EndpointProfile[];
   securityChecklists: SecurityChecklist[];
+  securityReports: SecurityReport[];
   metrics: {
     filesAnalyzed: number;
     endpointsFound: number;
     securityChecklistsGenerated: number;
+    securityReportsGenerated: number;
     issuesFound: number;
     analysisTime: number;
   };

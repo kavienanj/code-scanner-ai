@@ -1,4 +1,5 @@
 import { openai } from "@ai-sdk/openai";
+import { anthropic } from '@ai-sdk/anthropic';
 import { generateText } from "ai";
 import { FileEntry } from "../code-cleaner";
 import { promises as fs } from "fs";
@@ -11,8 +12,8 @@ import path from "path";
 /** Output directory for debug JSON files */
 export const SENTINEL_OUTPUT_DIR = path.join(process.cwd(), "output", "sentinel-agent");
 
-/** Default OpenAI model to use for the Sentinel Agent */
-export const SENTINEL_DEFAULT_MODEL = "gpt-5.1-2025-11-13";
+/** Default model to use for the Sentinel Agent */
+export const SENTINEL_DEFAULT_MODEL = "claude-opus-4-5-20251101";
 
 /** Maximum depth for tracing a single endpoint (number of LLM calls) */
 export const SENTINEL_DEFAULT_MAX_DEPTH = 10;
@@ -450,7 +451,9 @@ export class SentinelAgent {
 
       // Generate response from the agent
       const { text } = await generateText({
-        model: openai(this.model),
+        model: this.model.startsWith("claude-") 
+            ? anthropic(this.model)
+            : openai(this.model),
         system: SENTINEL_SYSTEM_PROMPT,
         messages: conversationHistory,
         abortSignal: this.abortSignal,

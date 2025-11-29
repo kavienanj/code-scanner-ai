@@ -12,10 +12,13 @@ import {
 import {
   createSentinelAgent,
   createGuardianAgent,
+  createInspectorAgent,
   generateProjectTree,
   EndpointProfile,
   FlowProfile,
   SecurityChecklist,
+  SecurityReport,
+  InspectionInput,
   SENTINEL_PROJECT_TREE_DEPTH,
 } from "./agents";
 
@@ -190,17 +193,85 @@ export async function runAnalysis(
       addLog(jobId, "info", "⏭️ Skipping Guardian Agent (no endpoints found)");
     }
 
-    // Stage 5: Build dependency graph
+    // Stage 5: Inspector Agent - Security Report Generation
     checkCancellation(jobId, signal);
-    updateProgress(jobId, 50, 100, "Building dependency graph");
+    let securityReports: SecurityReport[] = [];
+    
+    if (endpointProfiles.length > 0 && securityChecklists.length > 0) {
+      updateProgress(jobId, 50, 100, "Running Inspector Agent");
+      addLog(jobId, "info", "🕵️ Starting Inspector Agent for security inspection...");
+      
+      try {
+        // Match endpoints with their checklists
+        const inspectionInputs: InspectionInput[] = [];
+        for (const endpoint of endpointProfiles) {
+          const checklist = securityChecklists.find(
+            (c) => c.flow_name === endpoint.flow_name
+          );
+          if (checklist) {
+            inspectionInputs.push({ endpoint, checklist });
+          }
+        }
+
+        if (inspectionInputs.length > 0) {
+          const inspectorAgent = createInspectorAgent({
+            saveDebugOutput: true,
+            onLog: (message) => {
+              addLog(jobId, "info", `   ${message}`);
+            },
+            abortSignal: signal,
+          });
+
+          securityReports = await inspectorAgent.inspectFlows(inspectionInputs);
+
+          addLog(jobId, "success", `   Inspector Agent generated ${securityReports.length} security reports`);
+          
+          // Log summary of findings
+          let totalImplemented = 0;
+          let totalMissing = 0;
+          let totalAutoHandled = 0;
+          for (const report of securityReports) {
+            totalImplemented += report.implemented.length;
+            totalMissing += report.missing.length;
+            totalAutoHandled += report.auto_handled.length;
+          }
+          addLog(jobId, "info", `   📊 Controls: ${totalImplemented} implemented, ${totalMissing} missing, ${totalAutoHandled} auto-handled`);
+          
+          // Log severity summary
+          const criticalCount = securityReports.filter(r => r.summary.overall_severity === "critical").length;
+          const highCount = securityReports.filter(r => r.summary.overall_severity === "high").length;
+          if (criticalCount > 0) {
+            addLog(jobId, "warn", `   🚨 ${criticalCount} endpoint(s) with critical severity issues`);
+          }
+          if (highCount > 0) {
+            addLog(jobId, "warn", `   ⚠️ ${highCount} endpoint(s) with high severity issues`);
+          }
+        } else {
+          addLog(jobId, "info", "   No matching endpoint-checklist pairs found");
+        }
+      } catch (error) {
+        if (error instanceof CancellationError) {
+          throw error;
+        }
+        const errorMsg = error instanceof Error ? error.message : "Unknown error";
+        addLog(jobId, "warn", `   ⚠️ Inspector Agent encountered an issue: ${errorMsg}`);
+        addLog(jobId, "info", "   Continuing with remaining analysis stages...");
+      }
+    } else {
+      addLog(jobId, "info", "⏭️ Skipping Inspector Agent (no endpoints or checklists found)");
+    }
+
+    // Stage 6: Build dependency graph
+    checkCancellation(jobId, signal);
+    updateProgress(jobId, 65, 100, "Building dependency graph");
     addLog(jobId, "info", "🕸️ Building dependency graph...");
     await delay(1000, signal);
     addLog(jobId, "success", "   Dependency graph constructed");
     await delay(300, signal);
 
-    // Stage 6: Analyze code patterns
+    // Stage 7: Analyze code patterns
     checkCancellation(jobId, signal);
-    updateProgress(jobId, 60, 100, "Analyzing code patterns");
+    updateProgress(jobId, 75, 100, "Analyzing code patterns");
     addLog(jobId, "info", "🔬 Analyzing code patterns...");
     await delay(800, signal);
 
@@ -282,16 +353,24 @@ export async function runAnalysis(
     
     const analysisTime = Date.now() - startTime;
 
+    // Calculate total missing controls (issues) from security reports
+    const totalMissingControls = securityReports.reduce(
+      (sum, report) => sum + report.missing.length,
+      0
+    );
+
     const result: AnalysisResult = {
       summary: `Analysis completed successfully for ${framework.framework} project with ${files.length} files.`,
       findings,
       endpointProfiles,
       securityChecklists,
+      securityReports,
       metrics: {
         filesAnalyzed: files.length,
         endpointsFound: endpointProfiles.length,
         securityChecklistsGenerated: securityChecklists.length,
-        issuesFound: findings.filter((f) => f.severity !== "info").length,
+        securityReportsGenerated: securityReports.length,
+        issuesFound: totalMissingControls,
         analysisTime,
       },
     };

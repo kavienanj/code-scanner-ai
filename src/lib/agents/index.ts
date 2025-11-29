@@ -46,3 +46,29 @@ export {
   type GuardianErrorResponse,
   type GuardianDebugOutput,
 } from "./guardian-agent";
+
+// Inspector Agent exports
+export {
+  // Agent class and factory
+  InspectorAgent,
+  createInspectorAgent,
+  // Configuration constants
+  INSPECTOR_DEFAULT_MODEL,
+  INSPECTOR_MAX_RETRIES,
+  INSPECTOR_SYSTEM_PROMPT,
+  INSPECTOR_OUTPUT_DIR,
+  // Types
+  type SecuritySeverity,
+  type CodeLocation,
+  type ImplementedControl,
+  type MissingControl,
+  type AutoHandledControl,
+  type SecurityReportSummary,
+  type SecurityReport,
+  type InspectionInput,
+  type InspectorAgentOptions,
+  type InspectorAgentResponse,
+  type InspectorCompletedResponse,
+  type InspectorErrorResponse,
+  type InspectorDebugOutput,
+} from "./inspector-agent";
