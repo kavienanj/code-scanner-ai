@@ -134,8 +134,17 @@ export async function runAnalysis(
           saveDebugOutput: true,
           onLog: (message) => {
             addLog(jobId, "info", `   ${message}`);
-            // Track completed flows
-            if (message.includes("Generated checklist") || message.includes("checklist for")) {
+            // Track progress when analyzing a flow (matches "[X/Y] Analyzing:")
+            if (message.includes("Analyzing:")) {
+              const match = message.match(/\[(\d+)\/(\d+)\]/);
+              if (match) {
+                completedFlows = parseInt(match[1], 10) - 1; // Currently analyzing, not completed yet
+                const progress = calcProgress(PROGRESS.GUARDIAN, completedFlows, totalFlows);
+                updateProgress(jobId, progress, 100, `Guardian Agent: Analyzing ${completedFlows + 1}/${totalFlows}`);
+              }
+            }
+            // Track completed flows (matches "✅ Generated X required")
+            if (message.includes("✅ Generated")) {
               completedFlows++;
               const progress = calcProgress(PROGRESS.GUARDIAN, completedFlows, totalFlows);
               updateProgress(jobId, progress, 100, `Guardian Agent: ${completedFlows}/${totalFlows} checklists`);
@@ -186,8 +195,17 @@ export async function runAnalysis(
             saveDebugOutput: true,
             onLog: (message) => {
               addLog(jobId, "info", `   ${message}`);
-              // Track completed inspections
-              if (message.includes("Inspected") || message.includes("report for")) {
+              // Track progress when inspecting a flow (matches "[X/Y] Inspecting:")
+              if (message.includes("Inspecting:")) {
+                const match = message.match(/\[(\d+)\/(\d+)\]/);
+                if (match) {
+                  completedInspections = parseInt(match[1], 10) - 1; // Currently inspecting, not completed yet
+                  const progress = calcProgress(PROGRESS.INSPECTOR, completedInspections, totalInspections);
+                  updateProgress(jobId, progress, 100, `Inspector Agent: Inspecting ${completedInspections + 1}/${totalInspections}`);
+                }
+              }
+              // Track completed inspections (matches "✅ X implemented")
+              if (message.includes("✅") && message.includes("implemented")) {
                 completedInspections++;
                 const progress = calcProgress(PROGRESS.INSPECTOR, completedInspections, totalInspections);
                 updateProgress(jobId, progress, 100, `Inspector Agent: ${completedInspections}/${totalInspections} inspected`);

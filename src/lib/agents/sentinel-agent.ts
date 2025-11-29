@@ -13,7 +13,7 @@ import path from "path";
 export const SENTINEL_OUTPUT_DIR = path.join(process.cwd(), "output", "sentinel-agent");
 
 /** Default model to use for the Sentinel Agent */
-export const SENTINEL_DEFAULT_MODEL = "claude-opus-4-5-20251101";
+export const SENTINEL_DEFAULT_MODEL = process.env.DEFAULT_MODEL || "claude-opus-4-5-20251101";
 
 /** Maximum depth for tracing a single endpoint (number of LLM calls) */
 export const SENTINEL_DEFAULT_MAX_DEPTH = 10;

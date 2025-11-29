@@ -14,7 +14,7 @@ import { SecurityChecklist, SecurityControl } from "./guardian-agent";
 export const INSPECTOR_OUTPUT_DIR = path.join(process.cwd(), "output", "inspector-agent");
 
 /** Default model to use for the Inspector Agent */
-export const INSPECTOR_DEFAULT_MODEL = "claude-opus-4-5-20251101"; // "gpt-5.1-2025-11-13";
+export const INSPECTOR_DEFAULT_MODEL = process.env.DEFAULT_MODEL || "claude-opus-4-5-20251101"; // "gpt-5.1-2025-11-13";
 
 /** Maximum retries for parsing agent response */
 export const INSPECTOR_MAX_RETRIES = 3;
