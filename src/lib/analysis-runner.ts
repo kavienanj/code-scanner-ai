@@ -85,7 +85,7 @@ export async function runAnalysis(
     try {
       let endpointsFound = 0;
       const sentinelAgent = createSentinelAgent({
-        saveDebugOutput: true,
+        saveDebugOutput: false,
         onLog: (message) => {
           addLog(jobId, "info", `   ${message}`);
           // Increment progress for each endpoint found (estimate ~10 max for progress)
@@ -131,7 +131,7 @@ export async function runAnalysis(
         let completedFlows = 0;
 
         const guardianAgent = createGuardianAgent({
-          saveDebugOutput: true,
+          saveDebugOutput: false,
           onLog: (message) => {
             addLog(jobId, "info", `   ${message}`);
             // Track progress when analyzing a flow (matches "[X/Y] Analyzing:")
@@ -192,7 +192,7 @@ export async function runAnalysis(
           let completedInspections = 0;
 
           const inspectorAgent = createInspectorAgent({
-            saveDebugOutput: true,
+            saveDebugOutput: false,
             onLog: (message) => {
               addLog(jobId, "info", `   ${message}`);
               // Track progress when inspecting a flow (matches "[X/Y] Inspecting:")
