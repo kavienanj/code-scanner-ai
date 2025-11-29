@@ -32,6 +32,7 @@ export interface AnalysisResult {
     securityChecklistsGenerated: number;
     securityReportsGenerated: number;
     issuesFound: number;
+    vulnerabilitiesFound: number;
     analysisTime: number;
   };
 }

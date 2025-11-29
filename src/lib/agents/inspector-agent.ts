@@ -20,7 +20,7 @@ export const INSPECTOR_DEFAULT_MODEL = "claude-opus-4-5-20251101"; // "gpt-5.1-2
 export const INSPECTOR_MAX_RETRIES = 3;
 
 /** System prompt for the Inspector Agent */
-export const INSPECTOR_SYSTEM_PROMPT = `You are the Inspector Agent, a security auditor that matches code implementations against security checklists.
+export const INSPECTOR_SYSTEM_PROMPT = `You are the Inspector Agent, a security auditor that matches code implementations against security checklists AND identifies active vulnerabilities in the code.
 
 You will receive:
 1. An endpoint's flow data including detailed markdown documentation of the code
@@ -28,10 +28,22 @@ You will receive:
 
 ## Your Task:
 
+### Part A: Control Matching
 Analyze the code documentation and determine for each security control whether it is:
-- **Implemented**: The control is present in the code (cite specific file and line numbers)
+- **Implemented**: The control is present in the code (cite specific file and code snippet)
 - **Missing**: The control is not implemented and should be added
 - **Auto-Handled**: The framework or library automatically handles this (e.g., ORM prevents SQL injection)
+
+### Part B: Vulnerability Detection
+Actively scan the code for security vulnerabilities such as:
+- SQL Injection (raw queries with string concatenation)
+- XSS (unsanitized user input rendered as HTML)
+- Command Injection (exec/spawn with user input)
+- Path Traversal (file operations with user-controlled paths)
+- Hardcoded Secrets (API keys, passwords in code)
+- Insecure Deserialization
+- SSRF (user-controlled URLs in HTTP requests)
+- Weak Cryptography
 
 ## Your Process:
 
@@ -43,17 +55,25 @@ Read the markdown documentation carefully. Look for:
 - Security middleware usage
 - Database query patterns
 - Encryption/hashing usage
+- **Dangerous function calls with user input**
 
 ### Step 2: Match Controls
 For each control in the checklist:
 1. Search the code for evidence of implementation
-2. If found, note the file path and line number(s)
+2. If found, note the file path and code snippet
 3. If handled by framework, explain how
 4. If missing, confirm it's not present
 
-### Step 3: Assign Severity
-For MISSING controls only, assign severity based on:
-- **Critical**: Immediate security risk, data breach potential
+### Step 3: Detect Vulnerabilities
+Scan for active security vulnerabilities:
+1. Look for dangerous patterns (eval, exec, raw SQL, innerHTML, etc.)
+2. Trace user input to dangerous sinks
+3. For each vulnerability found, cite the exact vulnerable code
+4. Assign severity and provide a fix recommendation
+
+### Step 4: Assign Severity
+For MISSING controls and VULNERABILITIES, assign severity based on:
+- **Critical**: Immediate security risk, data breach potential, actively exploitable
 - **High**: Significant vulnerability, should fix before production
 - **Medium**: Security gap, plan to address
 - **Low**: Minor improvement, nice to have
@@ -63,6 +83,7 @@ For MISSING controls only, assign severity based on:
 - If a control is partially implemented, mark as implemented with a note
 - Consider the endpoint's sensitivity level
 - Framework defaults count as auto-handled
+- Only report REAL vulnerabilities with concrete evidence in the code
 
 ## Response Format:
 
@@ -99,25 +120,47 @@ For MISSING controls only, assign severity based on:
         "explanation": "Prisma uses parameterized queries by default"
       }
     ],
+    "vulnerabilities": [
+      {
+        "id": "VULN-001",
+        "title": "SQL Injection in User Search",
+        "type": "sql_injection",
+        "severity": "critical",
+        "description": "User input is directly concatenated into SQL query without sanitization",
+        "location": {
+          "file": "src/services/user.service.ts",
+          "code_snippet": "db.query(\`SELECT * FROM users WHERE name = '\${userInput}'\`)"
+        },
+        "recommendation": "Use parameterized queries: db.query('SELECT * FROM users WHERE name = ?', [userInput])"
+      }
+    ],
     "summary": {
       "total_controls": 10,
       "implemented_count": 6,
       "missing_count": 2,
       "auto_handled_count": 2,
-      "overall_severity": "medium"
+      "vulnerabilities_count": 1,
+      "overall_severity": "critical"
     }
   }
 }
 \`\`\`
 
+## Vulnerability Types:
+- sql_injection, xss, command_injection, path_traversal
+- hardcoded_secret, insecure_deserialization, ssrf
+- weak_crypto, authentication_bypass, authorization_flaw
+- sensitive_data_exposure, insecure_configuration
+
 ## Severity Guidelines:
-- **Critical**: 1+ critical missing controls
-- **High**: No critical but 1+ high missing controls
-- **Medium**: No critical/high but 1+ medium missing controls
-- **Low**: Only low severity missing controls or none missing
+- **Critical**: 1+ critical vulnerabilities OR critical missing controls
+- **High**: No critical but 1+ high severity issues
+- **Medium**: No critical/high but 1+ medium severity issues  
+- **Low**: Only low severity issues or none
 
 Keep code_snippet to the most relevant line(s) of code (max 3 lines, can be multiline string).
-Be concise but specific in evidence and recommendations.`;
+Be concise but specific in evidence and recommendations.
+ONLY report vulnerabilities you can see evidence of in the code - do not speculate.`;
 
 // ============================================================================
 // Types
@@ -157,12 +200,40 @@ export interface AutoHandledControl {
   explanation: string;
 }
 
+/** Vulnerability types */
+export type VulnerabilityType = 
+  | "sql_injection"
+  | "xss"
+  | "command_injection"
+  | "path_traversal"
+  | "hardcoded_secret"
+  | "insecure_deserialization"
+  | "ssrf"
+  | "weak_crypto"
+  | "authentication_bypass"
+  | "authorization_flaw"
+  | "sensitive_data_exposure"
+  | "insecure_configuration"
+  | "other";
+
+/** Vulnerability finding */
+export interface Vulnerability {
+  id: string;
+  title: string;
+  type: VulnerabilityType;
+  severity: SecuritySeverity;
+  description: string;
+  location: CodeLocation;
+  recommendation: string;
+}
+
 /** Security report summary */
 export interface SecurityReportSummary {
   total_controls: number;
   implemented_count: number;
   missing_count: number;
   auto_handled_count: number;
+  vulnerabilities_count: number;
   overall_severity: SecuritySeverity | "none";
 }
 
@@ -172,6 +243,7 @@ export interface SecurityReport {
   implemented: ImplementedControl[];
   missing: MissingControl[];
   auto_handled: AutoHandledControl[];
+  vulnerabilities: Vulnerability[];
   summary: SecurityReportSummary;
 }
 
@@ -282,8 +354,16 @@ function parseInspectorResponse(text: string): InspectorAgentResponse {
       if (!Array.isArray(parsed.result.auto_handled)) {
         throw new Error("result missing 'auto_handled' array");
       }
+      // Ensure vulnerabilities array exists (default to empty if not present)
+      if (!Array.isArray(parsed.result.vulnerabilities)) {
+        parsed.result.vulnerabilities = [];
+      }
       if (!parsed.result.summary) {
         throw new Error("result missing 'summary'");
+      }
+      // Ensure vulnerabilities_count exists in summary
+      if (typeof parsed.result.summary.vulnerabilities_count !== 'number') {
+        parsed.result.summary.vulnerabilities_count = parsed.result.vulnerabilities.length;
       }
       return parsed as InspectorCompletedResponse;
     }

@@ -230,12 +230,17 @@ export async function runAnalysis(
           let totalImplemented = 0;
           let totalMissing = 0;
           let totalAutoHandled = 0;
+          let totalVulnerabilities = 0;
           for (const report of securityReports) {
             totalImplemented += report.implemented.length;
             totalMissing += report.missing.length;
             totalAutoHandled += report.auto_handled.length;
+            totalVulnerabilities += report.vulnerabilities?.length || 0;
           }
           addLog(jobId, "info", `   📊 Controls: ${totalImplemented} implemented, ${totalMissing} missing, ${totalAutoHandled} auto-handled`);
+          if (totalVulnerabilities > 0) {
+            addLog(jobId, "warn", `   🔴 Vulnerabilities found: ${totalVulnerabilities}`);
+          }
           
           // Log severity summary
           const criticalCount = securityReports.filter(r => r.summary.overall_severity === "critical").length;
@@ -353,9 +358,13 @@ export async function runAnalysis(
     
     const analysisTime = Date.now() - startTime;
 
-    // Calculate total missing controls (issues) from security reports
+    // Calculate total issues from security reports (missing controls + vulnerabilities)
     const totalMissingControls = securityReports.reduce(
       (sum, report) => sum + report.missing.length,
+      0
+    );
+    const totalVulnerabilities = securityReports.reduce(
+      (sum, report) => sum + (report.vulnerabilities?.length || 0),
       0
     );
 
@@ -371,6 +380,7 @@ export async function runAnalysis(
         securityChecklistsGenerated: securityChecklists.length,
         securityReportsGenerated: securityReports.length,
         issuesFound: totalMissingControls,
+        vulnerabilitiesFound: totalVulnerabilities,
         analysisTime,
       },
     };

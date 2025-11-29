@@ -74,16 +74,28 @@ interface AutoHandledControl {
   explanation: string;
 }
 
+interface Vulnerability {
+  id: string;
+  title: string;
+  type: string;
+  severity: "critical" | "high" | "medium" | "low";
+  description: string;
+  location: CodeLocation;
+  recommendation: string;
+}
+
 interface SecurityReport {
   flow_name: string;
   implemented: ImplementedControl[];
   missing: MissingControl[];
   auto_handled: AutoHandledControl[];
+  vulnerabilities: Vulnerability[];
   summary: {
     total_controls: number;
     implemented_count: number;
     missing_count: number;
     auto_handled_count: number;
+    vulnerabilities_count: number;
     overall_severity: "critical" | "high" | "medium" | "low" | "none";
   };
 }
@@ -105,6 +117,7 @@ interface AnalysisResult {
     securityChecklistsGenerated: number;
     securityReportsGenerated: number;
     issuesFound: number;
+    vulnerabilitiesFound: number;
     analysisTime: number;
   };
 }
@@ -237,6 +250,22 @@ export default function TaskPage() {
 
   const formatTime = (timestamp: number) => {
     return new Date(timestamp).toLocaleTimeString();
+  };
+
+  const formatDuration = (ms: number) => {
+    const seconds = ms / 1000;
+    if (seconds < 60) {
+      return `${seconds.toFixed(1)}s`;
+    }
+    const minutes = seconds / 60;
+    if (minutes < 60) {
+      const mins = Math.floor(minutes);
+      const secs = Math.round(seconds % 60);
+      return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+    }
+    const hours = Math.floor(minutes / 60);
+    const remainingMins = Math.round(minutes % 60);
+    return remainingMins > 0 ? `${hours}h ${remainingMins}m` : `${hours}h`;
   };
 
   return (
@@ -385,20 +414,20 @@ export default function TaskPage() {
                   <p className="text-sm text-zinc-500">Endpoints Found</p>
                 </div>
                 <div className="rounded-lg bg-white p-4 dark:bg-zinc-900">
-                  <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
-                    {result.metrics.securityReportsGenerated}
+                  <p className={`text-2xl font-bold ${(result.metrics.vulnerabilitiesFound || 0) > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                    {result.metrics.vulnerabilitiesFound || 0}
                   </p>
-                  <p className="text-sm text-zinc-500">Security Reports</p>
+                  <p className="text-sm text-zinc-500">Vulnerabilities</p>
                 </div>
                 <div className="rounded-lg bg-white p-4 dark:bg-zinc-900">
                   <p className={`text-2xl font-bold ${result.metrics.issuesFound > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-green-600 dark:text-green-400'}`}>
                     {result.metrics.issuesFound}
                   </p>
-                  <p className="text-sm text-zinc-500">Missing Controls</p>
+                  <p className="text-sm text-zinc-500">Total Issues</p>
                 </div>
                 <div className="rounded-lg bg-white p-4 dark:bg-zinc-900">
                   <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
-                    {(result.metrics.analysisTime / 1000).toFixed(1)}s
+                    {formatDuration(result.metrics.analysisTime)}
                   </p>
                   <p className="text-sm text-zinc-500">Analysis Time</p>
                 </div>
@@ -426,7 +455,12 @@ export default function TaskPage() {
                       className="flex items-center gap-2"
                     >
                       <span className="truncate max-w-[150px]">{report.flow_name}</span>
-                      {report.summary.overall_severity !== "none" && (
+                      {(report.vulnerabilities?.length || 0) > 0 && (
+                        <Badge variant="destructive" className="text-xs">
+                          {report.vulnerabilities.length} vuln
+                        </Badge>
+                      )}
+                      {report.summary.overall_severity !== "none" && report.summary.missing_count > 0 && (
                         <Badge
                           variant={
                             report.summary.overall_severity === "critical"
@@ -437,7 +471,7 @@ export default function TaskPage() {
                           }
                           className="text-xs"
                         >
-                          {report.summary.missing_count}
+                          {report.summary.missing_count} missing
                         </Badge>
                       )}
                     </TabsTrigger>
@@ -531,7 +565,7 @@ export default function TaskPage() {
                         <h4 className="mb-3 font-semibold text-zinc-900 dark:text-zinc-100">
                           📊 Security Summary
                         </h4>
-                        <div className="grid grid-cols-4 gap-4 text-center">
+                        <div className="grid grid-cols-5 gap-4 text-center">
                           <div>
                             <p className="text-2xl font-bold text-green-600">{report.summary.implemented_count}</p>
                             <p className="text-xs text-zinc-500">Implemented</p>
@@ -543,6 +577,10 @@ export default function TaskPage() {
                           <div>
                             <p className="text-2xl font-bold text-blue-600">{report.summary.auto_handled_count}</p>
                             <p className="text-xs text-zinc-500">Auto-Handled</p>
+                          </div>
+                          <div>
+                            <p className="text-2xl font-bold text-red-600">{report.summary.vulnerabilities_count || 0}</p>
+                            <p className="text-xs text-zinc-500">Vulnerabilities</p>
                           </div>
                           <div>
                             <Badge
@@ -561,6 +599,67 @@ export default function TaskPage() {
                           </div>
                         </div>
                       </div>
+
+                      {/* Vulnerabilities - Most Critical */}
+                      {report.vulnerabilities && report.vulnerabilities.length > 0 && (
+                        <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950">
+                          <h4 className="mb-3 font-semibold text-red-800 dark:text-red-200">
+                            🔴 Vulnerabilities Found ({report.vulnerabilities.length})
+                          </h4>
+                          <div className="space-y-3">
+                            {report.vulnerabilities.map((vuln, i) => (
+                              <div
+                                key={i}
+                                className="rounded-lg bg-white p-3 dark:bg-zinc-900"
+                              >
+                                <div className="flex items-start justify-between gap-2 mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="font-mono text-xs">
+                                      {vuln.id}
+                                    </Badge>
+                                    <span className="font-medium text-zinc-900 dark:text-zinc-100">
+                                      {vuln.title}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="secondary" className="text-xs">
+                                      {vuln.type.replace(/_/g, ' ')}
+                                    </Badge>
+                                    <Badge
+                                      variant={
+                                        vuln.severity === "critical" || vuln.severity === "high"
+                                          ? "destructive"
+                                          : "secondary"
+                                      }
+                                    >
+                                      {vuln.severity}
+                                    </Badge>
+                                  </div>
+                                </div>
+                                <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-2">
+                                  {vuln.description}
+                                </p>
+                                {vuln.location && (
+                                  <div className="rounded bg-zinc-900 p-3 dark:bg-zinc-950 mb-2">
+                                    <p className="text-xs text-zinc-400 mb-1 font-mono">
+                                      📁 {vuln.location.file}
+                                    </p>
+                                    <pre className="text-xs text-red-400 overflow-x-auto">
+                                      <code>{vuln.location.code_snippet}</code>
+                                    </pre>
+                                  </div>
+                                )}
+                                <div className="rounded bg-zinc-100 p-2 dark:bg-zinc-800">
+                                  <p className="text-xs text-zinc-500 mb-1">🛠️ Fix Recommendation:</p>
+                                  <p className="text-sm text-zinc-700 dark:text-zinc-300">
+                                    {vuln.recommendation}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
                       {/* Missing Controls - Most Important */}
                       {report.missing.length > 0 && (

@@ -63,6 +63,8 @@ export {
   type ImplementedControl,
   type MissingControl,
   type AutoHandledControl,
+  type VulnerabilityType,
+  type Vulnerability,
   type SecurityReportSummary,
   type SecurityReport,
   type InspectionInput,
