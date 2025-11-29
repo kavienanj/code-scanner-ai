@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 
 interface LogEntry {
   timestamp: number;
@@ -438,149 +438,169 @@ export default function TaskPage() {
 
         {/* Detailed Security Reports */}
         {result && result.securityReports && result.securityReports.length > 0 && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="text-lg">Security Analysis Report</CardTitle>
-              <CardDescription>
-                Detailed security findings for each endpoint
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue={result.securityReports[0]?.flow_name || "0"} className="w-full">
-                <TabsList className="mb-4 flex flex-wrap h-auto gap-2">
-                  {result.securityReports.map((report, index) => (
-                    <TabsTrigger
-                      key={index}
-                      value={report.flow_name}
-                      className="flex items-center gap-2"
-                    >
-                      <span className="truncate max-w-[150px]">{report.flow_name}</span>
-                      {(report.vulnerabilities?.length || 0) > 0 && (
-                        <Badge variant="destructive" className="text-xs">
-                          {report.vulnerabilities.length} vuln
-                        </Badge>
-                      )}
-                      {report.summary.overall_severity !== "none" && report.summary.missing_count > 0 && (
-                        <Badge
-                          variant={
-                            report.summary.overall_severity === "critical"
-                              ? "destructive"
-                              : report.summary.overall_severity === "high"
-                              ? "destructive"
-                              : "secondary"
-                          }
-                          className="text-xs"
-                        >
-                          {report.summary.missing_count} missing
-                        </Badge>
-                      )}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
+          <div className="mb-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                Security Analysis Reports
+              </h2>
+              <Badge variant="outline">{result.securityReports.length} endpoints</Badge>
+            </div>
+            
+            {result.securityReports.map((report, reportIndex) => {
+              // Find matching endpoint and checklist
+              const endpoint = result.endpointProfiles?.find(
+                (ep) => ep.flow_name === report.flow_name
+              );
+              const checklist = result.securityChecklists?.find(
+                (cl) => cl.flow_name === report.flow_name
+              );
+              
+              const hasVulnerabilities = (report.vulnerabilities?.length || 0) > 0;
+              const hasMissing = report.summary.missing_count > 0;
+              const isSecure = report.summary.overall_severity === "none";
 
-                {result.securityReports.map((report, reportIndex) => {
-                  // Find matching endpoint and checklist
-                  const endpoint = result.endpointProfiles?.find(
-                    (ep) => ep.flow_name === report.flow_name
-                  );
-                  const checklist = result.securityChecklists?.find(
-                    (cl) => cl.flow_name === report.flow_name
-                  );
-
-                  return (
-                    <TabsContent key={reportIndex} value={report.flow_name} className="space-y-6">
-                      {/* Flow Overview */}
+              return (
+                <Collapsible key={reportIndex} className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+                  <CollapsibleTrigger className="p-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 rounded-lg">
+                    <div className="flex-1">
+                      {/* Header Row */}
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+                          {report.flow_name}
+                        </span>
+                        {hasVulnerabilities && (
+                          <Badge variant="destructive" className="text-xs">
+                            {report.vulnerabilities.length} vuln
+                          </Badge>
+                        )}
+                        {hasMissing && (
+                          <Badge 
+                            variant={report.summary.overall_severity === "critical" || report.summary.overall_severity === "high" ? "destructive" : "secondary"} 
+                            className="text-xs"
+                          >
+                            {report.summary.missing_count} missing
+                          </Badge>
+                        )}
+                        {isSecure && (
+                          <Badge variant="outline" className="text-xs text-green-600 border-green-600">
+                            ✓ Secure
+                          </Badge>
+                        )}
+                      </div>
+                      
+                      {/* Overview Row */}
+                      <div className="flex items-center gap-4 text-sm text-zinc-500">
+                        {endpoint && (
+                          <>
+                            <span className="font-mono text-xs">{endpoint.entry_point}</span>
+                            <Badge variant="outline" className="text-xs">
+                              {endpoint.sensitivity_level}
+                            </Badge>
+                          </>
+                        )}
+                        <span className="text-xs">
+                          {report.summary.implemented_count} ✓ | {report.summary.missing_count} ⚠ | {report.summary.auto_handled_count} 🔧
+                        </span>
+                      </div>
+                    </div>
+                  </CollapsibleTrigger>
+                  
+                  <CollapsibleContent className="border-t border-zinc-200 dark:border-zinc-800">
+                    <div className="p-4 space-y-4">
+                      {/* Endpoint Overview */}
                       {endpoint && (
-                        <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-                          <h4 className="mb-3 font-semibold text-zinc-900 dark:text-zinc-100">
-                            📍 Endpoint Overview
-                          </h4>
-                          <div className="grid gap-3 sm:grid-cols-2">
-                            <div>
-                              <p className="text-xs text-zinc-500">Entry Point</p>
-                              <p className="font-mono text-sm text-zinc-900 dark:text-zinc-100">
-                                {endpoint.entry_point}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-zinc-500">Sensitivity</p>
-                              <Badge
-                                variant={
-                                  endpoint.sensitivity_level === "critical"
-                                    ? "destructive"
-                                    : endpoint.sensitivity_level === "high"
-                                    ? "destructive"
-                                    : "secondary"
-                                }
-                              >
-                                {endpoint.sensitivity_level}
-                              </Badge>
-                            </div>
-                            <div className="sm:col-span-2">
-                              <p className="text-xs text-zinc-500">Purpose</p>
-                              <p className="text-sm text-zinc-700 dark:text-zinc-300">
-                                {endpoint.purpose}
-                              </p>
-                            </div>
-                            {endpoint.input_types.length > 0 && (
+                        <Collapsible defaultOpen className="rounded-lg border border-zinc-200 dark:border-zinc-700">
+                          <CollapsibleTrigger className="p-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 rounded-lg">
+                            <span className="font-medium text-sm text-zinc-900 dark:text-zinc-100">
+                              📍 Endpoint Details
+                            </span>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="px-3 pb-3">
+                            <div className="grid gap-3 sm:grid-cols-2 pt-2">
                               <div>
-                                <p className="text-xs text-zinc-500">Input Types</p>
-                                <div className="flex flex-wrap gap-1 mt-1">
-                                  {endpoint.input_types.map((type, i) => (
-                                    <Badge 
-                                      key={i} 
-                                      variant="outline" 
-                                      className="text-xs max-w-[150px] block overflow-hidden text-ellipsis whitespace-nowrap text-left cursor-default"
-                                      title={type}
-                                    >
-                                      {type}
-                                    </Badge>
-                                  ))}
-                                </div>
+                                <p className="text-xs text-zinc-500">Entry Point</p>
+                                <p className="font-mono text-sm text-zinc-900 dark:text-zinc-100">
+                                  {endpoint.entry_point}
+                                </p>
                               </div>
-                            )}
-                            {endpoint.output_types.length > 0 && (
                               <div>
-                                <p className="text-xs text-zinc-500">Output Types</p>
-                                <div className="flex flex-wrap gap-1 mt-1">
-                                  {endpoint.output_types.map((type, i) => (
-                                    <Badge 
-                                      key={i} 
-                                      variant="outline" 
-                                      className="text-xs max-w-[150px] block overflow-hidden text-ellipsis whitespace-nowrap text-left cursor-default"
-                                      title={type}
-                                    >
-                                      {type}
-                                    </Badge>
-                                  ))}
-                                </div>
+                                <p className="text-xs text-zinc-500">Sensitivity</p>
+                                <Badge
+                                  variant={
+                                    endpoint.sensitivity_level === "critical" || endpoint.sensitivity_level === "high"
+                                      ? "destructive"
+                                      : "secondary"
+                                  }
+                                >
+                                  {endpoint.sensitivity_level}
+                                </Badge>
                               </div>
-                            )}
-                          </div>
-                        </div>
+                              <div className="sm:col-span-2">
+                                <p className="text-xs text-zinc-500">Purpose</p>
+                                <p className="text-sm text-zinc-700 dark:text-zinc-300">
+                                  {endpoint.purpose}
+                                </p>
+                              </div>
+                              {endpoint.input_types.length > 0 && (
+                                <div>
+                                  <p className="text-xs text-zinc-500">Input Types</p>
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {endpoint.input_types.map((type, i) => (
+                                      <Badge 
+                                        key={i} 
+                                        variant="outline" 
+                                        className="text-xs max-w-[150px] block overflow-hidden text-ellipsis whitespace-nowrap text-left cursor-default"
+                                        title={type}
+                                      >
+                                        {type}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {endpoint.output_types.length > 0 && (
+                                <div>
+                                  <p className="text-xs text-zinc-500">Output Types</p>
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {endpoint.output_types.map((type, i) => (
+                                      <Badge 
+                                        key={i} 
+                                        variant="outline" 
+                                        className="text-xs max-w-[150px] block overflow-hidden text-ellipsis whitespace-nowrap text-left cursor-default"
+                                        title={type}
+                                      >
+                                        {type}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
                       )}
 
-                      {/* Security Summary */}
-                      <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-                        <h4 className="mb-3 font-semibold text-zinc-900 dark:text-zinc-100">
+                      {/* Security Summary - Always visible */}
+                      <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800/50">
+                        <h4 className="mb-2 text-sm font-medium text-zinc-900 dark:text-zinc-100">
                           📊 Security Summary
                         </h4>
-                        <div className="grid grid-cols-5 gap-4 text-center">
+                        <div className="grid grid-cols-5 gap-2 text-center">
                           <div>
-                            <p className="text-2xl font-bold text-green-600">{report.summary.implemented_count}</p>
+                            <p className="text-xl font-bold text-green-600">{report.summary.implemented_count}</p>
                             <p className="text-xs text-zinc-500">Implemented</p>
                           </div>
                           <div>
-                            <p className="text-2xl font-bold text-orange-600">{report.summary.missing_count}</p>
+                            <p className="text-xl font-bold text-orange-600">{report.summary.missing_count}</p>
                             <p className="text-xs text-zinc-500">Missing</p>
                           </div>
                           <div>
-                            <p className="text-2xl font-bold text-blue-600">{report.summary.auto_handled_count}</p>
-                            <p className="text-xs text-zinc-500">Auto-Handled</p>
+                            <p className="text-xl font-bold text-blue-600">{report.summary.auto_handled_count}</p>
+                            <p className="text-xs text-zinc-500">Auto</p>
                           </div>
                           <div>
-                            <p className="text-2xl font-bold text-red-600">{report.summary.vulnerabilities_count || 0}</p>
-                            <p className="text-xs text-zinc-500">Vulnerabilities</p>
+                            <p className="text-xl font-bold text-red-600">{report.summary.vulnerabilities_count || 0}</p>
+                            <p className="text-xs text-zinc-500">Vulns</p>
                           </div>
                           <div>
                             <Badge
@@ -591,279 +611,229 @@ export default function TaskPage() {
                                   ? "secondary"
                                   : "outline"
                               }
-                              className="mt-1"
+                              className="text-xs"
                             >
-                              {report.summary.overall_severity === "none" ? "✓ Secure" : report.summary.overall_severity}
+                              {report.summary.overall_severity === "none" ? "✓ OK" : report.summary.overall_severity}
                             </Badge>
                             <p className="text-xs text-zinc-500 mt-1">Severity</p>
                           </div>
                         </div>
                       </div>
 
-                      {/* Vulnerabilities - Most Critical */}
+                      {/* Vulnerabilities */}
                       {report.vulnerabilities && report.vulnerabilities.length > 0 && (
-                        <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950">
-                          <h4 className="mb-3 font-semibold text-red-800 dark:text-red-200">
-                            🔴 Vulnerabilities Found ({report.vulnerabilities.length})
-                          </h4>
-                          <div className="space-y-3">
-                            {report.vulnerabilities.map((vuln, i) => (
-                              <div
-                                key={i}
-                                className="rounded-lg bg-white p-3 dark:bg-zinc-900"
-                              >
-                                <div className="flex items-start justify-between gap-2 mb-2">
-                                  <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="font-mono text-xs">
-                                      {vuln.id}
-                                    </Badge>
-                                    <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                                      {vuln.title}
-                                    </span>
+                        <Collapsible defaultOpen className="rounded-lg border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950">
+                          <CollapsibleTrigger className="p-3 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-lg">
+                            <span className="font-medium text-sm text-red-800 dark:text-red-200">
+                              🔴 Vulnerabilities ({report.vulnerabilities.length})
+                            </span>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="px-3 pb-3">
+                            <div className="space-y-3 pt-2">
+                              {report.vulnerabilities.map((vuln, i) => (
+                                <div key={i} className="rounded-lg bg-white p-3 dark:bg-zinc-900">
+                                  <div className="flex items-start justify-between gap-2 mb-2">
+                                    <div className="flex items-center gap-2">
+                                      <Badge variant="outline" className="font-mono text-xs">{vuln.id}</Badge>
+                                      <span className="font-medium text-zinc-900 dark:text-zinc-100">{vuln.title}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <Badge variant="secondary" className="text-xs">{vuln.type.replace(/_/g, ' ')}</Badge>
+                                      <Badge variant={vuln.severity === "critical" || vuln.severity === "high" ? "destructive" : "secondary"}>
+                                        {vuln.severity}
+                                      </Badge>
+                                    </div>
                                   </div>
-                                  <div className="flex items-center gap-2">
-                                    <Badge variant="secondary" className="text-xs">
-                                      {vuln.type.replace(/_/g, ' ')}
-                                    </Badge>
-                                    <Badge
-                                      variant={
-                                        vuln.severity === "critical" || vuln.severity === "high"
-                                          ? "destructive"
-                                          : "secondary"
-                                      }
-                                    >
-                                      {vuln.severity}
-                                    </Badge>
+                                  <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-2">{vuln.description}</p>
+                                  {vuln.location && (
+                                    <div className="rounded bg-zinc-900 p-3 dark:bg-zinc-950 mb-2">
+                                      <p className="text-xs text-zinc-400 mb-1 font-mono">📁 {vuln.location.file}</p>
+                                      <pre className="text-xs text-red-400 overflow-x-auto"><code>{vuln.location.code_snippet}</code></pre>
+                                    </div>
+                                  )}
+                                  <div className="rounded bg-zinc-100 p-2 dark:bg-zinc-800">
+                                    <p className="text-xs text-zinc-500 mb-1">🛠️ Fix:</p>
+                                    <p className="text-sm text-zinc-700 dark:text-zinc-300">{vuln.recommendation}</p>
                                   </div>
                                 </div>
-                                <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-2">
-                                  {vuln.description}
-                                </p>
-                                {vuln.location && (
-                                  <div className="rounded bg-zinc-900 p-3 dark:bg-zinc-950 mb-2">
-                                    <p className="text-xs text-zinc-400 mb-1 font-mono">
-                                      📁 {vuln.location.file}
-                                    </p>
-                                    <pre className="text-xs text-red-400 overflow-x-auto">
-                                      <code>{vuln.location.code_snippet}</code>
-                                    </pre>
-                                  </div>
-                                )}
-                                <div className="rounded bg-zinc-100 p-2 dark:bg-zinc-800">
-                                  <p className="text-xs text-zinc-500 mb-1">🛠️ Fix Recommendation:</p>
-                                  <p className="text-sm text-zinc-700 dark:text-zinc-300">
-                                    {vuln.recommendation}
-                                  </p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
+                              ))}
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
                       )}
 
-                      {/* Missing Controls - Most Important */}
+                      {/* Missing Controls */}
                       {report.missing.length > 0 && (
-                        <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 dark:border-orange-900 dark:bg-orange-950">
-                          <h4 className="mb-3 font-semibold text-orange-800 dark:text-orange-200">
-                            ⚠️ Missing Controls ({report.missing.length})
-                          </h4>
-                          <div className="space-y-3">
-                            {report.missing.map((control, i) => (
-                              <div
-                                key={i}
-                                className="rounded-lg bg-white p-3 dark:bg-zinc-900"
-                              >
-                                <div className="flex items-start justify-between gap-2 mb-2">
-                                  <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="font-mono text-xs">
-                                      {control.control_id}
+                        <Collapsible defaultOpen className="rounded-lg border border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950">
+                          <CollapsibleTrigger className="p-3 hover:bg-orange-100 dark:hover:bg-orange-900/50 rounded-lg">
+                            <span className="font-medium text-sm text-orange-800 dark:text-orange-200">
+                              ⚠️ Missing Controls ({report.missing.length})
+                            </span>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="px-3 pb-3">
+                            <div className="space-y-3 pt-2">
+                              {report.missing.map((control, i) => (
+                                <div key={i} className="rounded-lg bg-white p-3 dark:bg-zinc-900">
+                                  <div className="flex items-start justify-between gap-2 mb-2">
+                                    <div className="flex items-center gap-2">
+                                      <Badge variant="outline" className="font-mono text-xs">{control.control_id}</Badge>
+                                      <span className="font-medium text-zinc-900 dark:text-zinc-100">{control.control_name}</span>
+                                    </div>
+                                    <Badge variant={control.severity === "critical" || control.severity === "high" ? "destructive" : "secondary"}>
+                                      {control.severity}
                                     </Badge>
-                                    <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                                      {control.control_name}
-                                    </span>
                                   </div>
-                                  <Badge
-                                    variant={
-                                      control.severity === "critical" || control.severity === "high"
-                                        ? "destructive"
-                                        : "secondary"
-                                    }
-                                  >
-                                    {control.severity}
-                                  </Badge>
+                                  <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-2">{control.reason}</p>
+                                  <div className="rounded bg-zinc-100 p-2 dark:bg-zinc-800">
+                                    <p className="text-xs text-zinc-500 mb-1">💡 Recommendation:</p>
+                                    <p className="text-sm text-zinc-700 dark:text-zinc-300">{control.recommendation}</p>
+                                  </div>
                                 </div>
-                                <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-2">
-                                  {control.reason}
-                                </p>
-                                <div className="rounded bg-zinc-100 p-2 dark:bg-zinc-800">
-                                  <p className="text-xs text-zinc-500 mb-1">💡 Recommendation:</p>
-                                  <p className="text-sm text-zinc-700 dark:text-zinc-300">
-                                    {control.recommendation}
-                                  </p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
+                              ))}
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
                       )}
 
                       {/* Implemented Controls */}
                       {report.implemented.length > 0 && (
-                        <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-900 dark:bg-green-950">
-                          <h4 className="mb-3 font-semibold text-green-800 dark:text-green-200">
-                            ✅ Implemented Controls ({report.implemented.length})
-                          </h4>
-                          <div className="space-y-3">
-                            {report.implemented.map((control, i) => (
-                              <div
-                                key={i}
-                                className="rounded-lg bg-white p-3 dark:bg-zinc-900"
-                              >
-                                <div className="flex items-center gap-2 mb-2">
-                                  <Badge variant="outline" className="font-mono text-xs">
-                                    {control.control_id}
-                                  </Badge>
-                                  <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                                    {control.control_name}
-                                  </span>
-                                </div>
-                                <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-2">
-                                  {control.evidence}
-                                </p>
-                                {control.location && (
-                                  <div className="rounded bg-zinc-900 p-3 dark:bg-zinc-950">
-                                    <p className="text-xs text-zinc-400 mb-1 font-mono">
-                                      📁 {control.location.file}
-                                    </p>
-                                    <pre className="text-xs text-green-400 overflow-x-auto">
-                                      <code>{control.location.code_snippet}</code>
-                                    </pre>
+                        <Collapsible className="rounded-lg border border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950">
+                          <CollapsibleTrigger className="p-3 hover:bg-green-100 dark:hover:bg-green-900/50 rounded-lg">
+                            <span className="font-medium text-sm text-green-800 dark:text-green-200">
+                              ✅ Implemented Controls ({report.implemented.length})
+                            </span>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="px-3 pb-3">
+                            <div className="space-y-3 pt-2">
+                              {report.implemented.map((control, i) => (
+                                <div key={i} className="rounded-lg bg-white p-3 dark:bg-zinc-900">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <Badge variant="outline" className="font-mono text-xs">{control.control_id}</Badge>
+                                    <span className="font-medium text-zinc-900 dark:text-zinc-100">{control.control_name}</span>
                                   </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
+                                  <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-2">{control.evidence}</p>
+                                  {control.location && (
+                                    <div className="rounded bg-zinc-900 p-3 dark:bg-zinc-950">
+                                      <p className="text-xs text-zinc-400 mb-1 font-mono">📁 {control.location.file}</p>
+                                      <pre className="text-xs text-green-400 overflow-x-auto"><code>{control.location.code_snippet}</code></pre>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
                       )}
 
                       {/* Auto-Handled Controls */}
                       {report.auto_handled.length > 0 && (
-                        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950">
-                          <h4 className="mb-3 font-semibold text-blue-800 dark:text-blue-200">
-                            🔧 Auto-Handled by Framework ({report.auto_handled.length})
-                          </h4>
-                          <div className="space-y-3">
-                            {report.auto_handled.map((control, i) => (
-                              <div
-                                key={i}
-                                className="rounded-lg bg-white p-3 dark:bg-zinc-900"
-                              >
-                                <div className="flex items-center gap-2 mb-2">
-                                  <Badge variant="outline" className="font-mono text-xs">
-                                    {control.control_id}
-                                  </Badge>
-                                  <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                                    {control.control_name}
-                                  </span>
-                                  <Badge variant="secondary" className="text-xs">
-                                    {control.handled_by}
-                                  </Badge>
+                        <Collapsible className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950">
+                          <CollapsibleTrigger className="p-3 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-lg">
+                            <span className="font-medium text-sm text-blue-800 dark:text-blue-200">
+                              🔧 Auto-Handled ({report.auto_handled.length})
+                            </span>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="px-3 pb-3">
+                            <div className="space-y-3 pt-2">
+                              {report.auto_handled.map((control, i) => (
+                                <div key={i} className="rounded-lg bg-white p-3 dark:bg-zinc-900">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <Badge variant="outline" className="font-mono text-xs">{control.control_id}</Badge>
+                                    <span className="font-medium text-zinc-900 dark:text-zinc-100">{control.control_name}</span>
+                                    <Badge variant="secondary" className="text-xs">{control.handled_by}</Badge>
+                                  </div>
+                                  <p className="text-sm text-zinc-600 dark:text-zinc-400">{control.explanation}</p>
                                 </div>
-                                <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                                  {control.explanation}
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
+                              ))}
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
                       )}
 
                       {/* Security Checklist Reference */}
                       {checklist && (
-                        <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-                          <h4 className="mb-3 font-semibold text-zinc-900 dark:text-zinc-100">
-                            📋 Security Checklist
-                          </h4>
-                          <div className="space-y-4">
-                            {checklist.required_controls.length > 0 && (
-                              <div>
-                                <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                                  Required Controls ({checklist.required_controls.length})
-                                </p>
-                                <div className="flex flex-wrap gap-2">
-                                  {checklist.required_controls.map((ctrl, i) => (
-                                    <Badge
-                                      key={i}
-                                      variant={
-                                        report.implemented.some(ic => ic.control_id === ctrl.control_id)
-                                          ? "default"
-                                          : report.auto_handled.some(ac => ac.control_id === ctrl.control_id)
-                                          ? "secondary"
+                        <Collapsible className="rounded-lg border border-zinc-200 dark:border-zinc-700">
+                          <CollapsibleTrigger className="p-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 rounded-lg">
+                            <span className="font-medium text-sm text-zinc-900 dark:text-zinc-100">
+                              📋 Security Checklist
+                            </span>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="px-3 pb-3">
+                            <div className="space-y-4 pt-2">
+                              {checklist.required_controls.length > 0 && (
+                                <div>
+                                  <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                                    Required ({checklist.required_controls.length})
+                                  </p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {checklist.required_controls.map((ctrl, i) => (
+                                      <Badge
+                                        key={i}
+                                        variant={
+                                          report.implemented.some(ic => ic.control_id === ctrl.control_id) ? "default"
+                                          : report.auto_handled.some(ac => ac.control_id === ctrl.control_id) ? "secondary"
                                           : "destructive"
-                                      }
-                                      className="text-xs"
-                                      title={ctrl.description}
-                                    >
-                                      {ctrl.name}
-                                    </Badge>
-                                  ))}
+                                        }
+                                        className="text-xs"
+                                        title={ctrl.description}
+                                      >
+                                        {ctrl.name}
+                                      </Badge>
+                                    ))}
+                                  </div>
                                 </div>
-                              </div>
-                            )}
-                            {checklist.recommended_controls.length > 0 && (
-                              <div>
-                                <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                                  Recommended Controls ({checklist.recommended_controls.length})
-                                </p>
-                                <div className="flex flex-wrap gap-2">
-                                  {checklist.recommended_controls.map((ctrl, i) => (
-                                    <Badge
-                                      key={i}
-                                      variant={
-                                        report.implemented.some(ic => ic.control_id === ctrl.control_id)
-                                          ? "default"
-                                          : report.auto_handled.some(ac => ac.control_id === ctrl.control_id)
-                                          ? "secondary"
+                              )}
+                              {checklist.recommended_controls.length > 0 && (
+                                <div>
+                                  <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                                    Recommended ({checklist.recommended_controls.length})
+                                  </p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {checklist.recommended_controls.map((ctrl, i) => (
+                                      <Badge
+                                        key={i}
+                                        variant={
+                                          report.implemented.some(ic => ic.control_id === ctrl.control_id) ? "default"
+                                          : report.auto_handled.some(ac => ac.control_id === ctrl.control_id) ? "secondary"
                                           : "outline"
-                                      }
-                                      className="text-xs"
-                                      title={ctrl.description}
-                                    >
-                                      {ctrl.name}
-                                    </Badge>
-                                  ))}
+                                        }
+                                        className="text-xs"
+                                        title={ctrl.description}
+                                      >
+                                        {ctrl.name}
+                                      </Badge>
+                                    ))}
+                                  </div>
                                 </div>
-                              </div>
-                            )}
-                            {checklist.references.length > 0 && (
-                              <div>
-                                <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                                  References
-                                </p>
-                                <div className="flex flex-wrap gap-2">
-                                  {checklist.references.map((ref, i) => (
-                                    <a
-                                      key={i}
-                                      href={ref.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-xs text-blue-600 hover:underline dark:text-blue-400"
-                                    >
-                                      {ref.title} ↗
-                                    </a>
-                                  ))}
+                              )}
+                              {checklist.references.length > 0 && (
+                                <div>
+                                  <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">References</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {checklist.references.map((ref, i) => (
+                                      <a
+                                        key={i}
+                                        href={ref.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-xs text-blue-600 hover:underline dark:text-blue-400"
+                                      >
+                                        {ref.title} ↗
+                                      </a>
+                                    ))}
+                                  </div>
                                 </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                              )}
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
                       )}
-                    </TabsContent>
-                  );
-                })}
-              </Tabs>
-            </CardContent>
-          </Card>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              );
+            })}
+          </div>
         )}
 
         {/* Actions */}
