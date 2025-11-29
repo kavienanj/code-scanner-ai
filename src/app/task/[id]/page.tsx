@@ -493,7 +493,12 @@ export default function TaskPage() {
                                 <p className="text-xs text-zinc-500">Input Types</p>
                                 <div className="flex flex-wrap gap-1 mt-1">
                                   {endpoint.input_types.map((type, i) => (
-                                    <Badge key={i} variant="outline" className="text-xs">
+                                    <Badge 
+                                      key={i} 
+                                      variant="outline" 
+                                      className="text-xs max-w-[150px] block overflow-hidden text-ellipsis whitespace-nowrap text-left cursor-default"
+                                      title={type}
+                                    >
                                       {type}
                                     </Badge>
                                   ))}
@@ -505,7 +510,12 @@ export default function TaskPage() {
                                 <p className="text-xs text-zinc-500">Output Types</p>
                                 <div className="flex flex-wrap gap-1 mt-1">
                                   {endpoint.output_types.map((type, i) => (
-                                    <Badge key={i} variant="outline" className="text-xs">
+                                    <Badge 
+                                      key={i} 
+                                      variant="outline" 
+                                      className="text-xs max-w-[150px] block overflow-hidden text-ellipsis whitespace-nowrap text-left cursor-default"
+                                      title={type}
+                                    >
                                       {type}
                                     </Badge>
                                   ))}
