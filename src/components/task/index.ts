@@ -7,3 +7,5 @@ export { CancelledCard } from "./CancelledCard";
 export { ResultsCard } from "./ResultsCard";
 export { SecurityReportsSection } from "./SecurityReportsSection";
 export { SecurityReportCard } from "./SecurityReportCard";
+export { FindingsChart } from "./FindingsChart";
+export { SecurityScore } from "./SecurityScore";

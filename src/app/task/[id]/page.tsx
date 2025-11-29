@@ -133,7 +133,7 @@ export default function TaskPage() {
         />
 
         {/* Logs Card */}
-        <LogsCard logs={logs} />
+        <LogsCard logs={logs} isCompleted={status === "completed" || status === "failed" || status === "cancelled"} />
 
         {/* Error Card */}
         {error && <ErrorCard error={error} />}

@@ -22,29 +22,21 @@ import {
   SENTINEL_PROJECT_TREE_DEPTH,
 } from "./agents";
 
+// Progress allocation (total = 100%)
+const PROGRESS = {
+  INIT: { start: 0, end: 5 },
+  SENTINEL: { start: 5, end: 35 },
+  GUARDIAN: { start: 35, end: 65 },
+  INSPECTOR: { start: 65, end: 95 },
+  FINALIZE: { start: 95, end: 100 },
+};
+
 // Custom error for cancellation
 class CancellationError extends Error {
   constructor() {
     super("Job was cancelled");
     this.name = "CancellationError";
   }
-}
-
-// Helper to simulate async delay with cancellation support
-function delay(ms: number, signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(new CancellationError());
-      return;
-    }
-    
-    const timeout = setTimeout(resolve, ms);
-    
-    signal?.addEventListener("abort", () => {
-      clearTimeout(timeout);
-      reject(new CancellationError());
-    });
-  });
 }
 
 // Check if job should continue
@@ -54,9 +46,15 @@ function checkCancellation(jobId: string, signal?: AbortSignal): void {
   }
 }
 
+// Calculate progress within a stage
+function calcProgress(stage: { start: number; end: number }, current: number, total: number): number {
+  if (total === 0) return stage.end;
+  const stageRange = stage.end - stage.start;
+  return Math.round(stage.start + (current / total) * stageRange);
+}
+
 /**
- * Run the dummy analysis process
- * This simulates a long-running analysis with various stages
+ * Run the analysis process using AI agents
  */
 export async function runAnalysis(
   jobId: string,
@@ -73,46 +71,29 @@ export async function runAnalysis(
   try {
     // Start the job
     updateStatus(jobId, "running");
-    addLog(jobId, "info", "🚀 Starting code analysis...");
-    await delay(500, signal);
+    updateProgress(jobId, PROGRESS.INIT.start, 100, "Initializing");
+    addLog(jobId, "info", `🚀 Starting analysis for ${framework.framework} project (${files.length} files)`);
 
-    // Stage 1: Initialize
+    // Stage 1: Sentinel Agent - Endpoint Discovery
     checkCancellation(jobId, signal);
-    updateProgress(jobId, 5, 100, "Initializing analysis engine");
-    addLog(jobId, "info", `📦 Detected framework: ${framework.framework}`);
-    addLog(jobId, "info", `📊 Files to analyze: ${files.length}`);
-    await delay(800, signal);
-
-    // Stage 2: Parse files
-    checkCancellation(jobId, signal);
-    updateProgress(jobId, 15, 100, "Parsing source files");
-    addLog(jobId, "info", "🔍 Parsing source files...");
-    await delay(600, signal);
-
-    const fileTypes = new Map<string, number>();
-    for (const file of files) {
-      const ext = file.path.split(".").pop() || "unknown";
-      fileTypes.set(ext, (fileTypes.get(ext) || 0) + 1);
-    }
-
-    for (const [ext, count] of fileTypes) {
-      checkCancellation(jobId, signal);
-      addLog(jobId, "info", `   Found ${count} .${ext} files`);
-      await delay(200, signal);
-    }
-
-    // Stage 3: Sentinel Agent - Endpoint Tracing
-    checkCancellation(jobId, signal);
-    updateProgress(jobId, 20, 100, "Running Sentinel Agent");
-    addLog(jobId, "info", "🛡️ Starting Sentinel Agent for endpoint analysis...");
+    updateProgress(jobId, PROGRESS.SENTINEL.start, 100, "Sentinel Agent: Discovering endpoints");
+    addLog(jobId, "info", "🛡️ Sentinel Agent: Analyzing codebase for endpoints...");
     
     let endpointProfiles: EndpointProfile[] = [];
     let projectTree = "";
+    
     try {
+      let endpointsFound = 0;
       const sentinelAgent = createSentinelAgent({
         saveDebugOutput: true,
         onLog: (message) => {
           addLog(jobId, "info", `   ${message}`);
+          // Increment progress for each endpoint found (estimate ~10 max for progress)
+          if (message.includes("endpoint") || message.includes("flow")) {
+            endpointsFound++;
+            const progress = calcProgress(PROGRESS.SENTINEL, Math.min(endpointsFound, 10), 10);
+            updateProgress(jobId, progress, 100, `Sentinel Agent: Found ${endpointsFound} endpoint(s)`);
+          }
         },
         abortSignal: signal,
       });
@@ -120,34 +101,23 @@ export async function runAnalysis(
       endpointProfiles = await sentinelAgent.analyze(files);
       projectTree = generateProjectTree(files, SENTINEL_PROJECT_TREE_DEPTH);
       
-      addLog(jobId, "success", `   Sentinel Agent found ${endpointProfiles.length} endpoints`);
-      
-      for (const endpoint of endpointProfiles) {
-        addLog(
-          jobId,
-          "info",
-          `   📍 ${endpoint.entry_point} [${endpoint.sensitivity_level}] - ${endpoint.purpose}`
-        );
-      }
+      updateProgress(jobId, PROGRESS.SENTINEL.end, 100, `Sentinel Agent: Complete (${endpointProfiles.length} endpoints)`);
+      addLog(jobId, "success", `✓ Sentinel Agent: Discovered ${endpointProfiles.length} endpoints`);
     } catch (error) {
-      if (error instanceof CancellationError) {
-        throw error;
-      }
+      if (error instanceof CancellationError) throw error;
       const errorMsg = error instanceof Error ? error.message : "Unknown error";
-      addLog(jobId, "warn", `   ⚠️ Sentinel Agent encountered an issue: ${errorMsg}`);
-      addLog(jobId, "info", "   Continuing with remaining analysis stages...");
+      addLog(jobId, "warn", `⚠️ Sentinel Agent error: ${errorMsg}`);
     }
 
-    // Stage 4: Guardian Agent - Security Checklist Generation
+    // Stage 2: Guardian Agent - Security Checklist Generation
     checkCancellation(jobId, signal);
     let securityChecklists: SecurityChecklist[] = [];
     
     if (endpointProfiles.length > 0) {
-      updateProgress(jobId, 35, 100, "Running Guardian Agent");
-      addLog(jobId, "info", "🔐 Starting Guardian Agent for security analysis...");
+      updateProgress(jobId, PROGRESS.GUARDIAN.start, 100, "Guardian Agent: Generating security checklists");
+      addLog(jobId, "info", "🔐 Guardian Agent: Creating security checklists...");
       
       try {
-        // Convert EndpointProfiles to FlowProfiles (exclude mark_down)
         const flowProfiles: FlowProfile[] = endpointProfiles.map((ep) => ({
           flow_name: ep.flow_name,
           purpose: ep.purpose,
@@ -157,220 +127,116 @@ export async function runAnalysis(
           sensitivity_level: ep.sensitivity_level,
         }));
 
+        const totalFlows = flowProfiles.length;
+        let completedFlows = 0;
+
         const guardianAgent = createGuardianAgent({
           saveDebugOutput: true,
           onLog: (message) => {
             addLog(jobId, "info", `   ${message}`);
+            // Track completed flows
+            if (message.includes("Generated checklist") || message.includes("checklist for")) {
+              completedFlows++;
+              const progress = calcProgress(PROGRESS.GUARDIAN, completedFlows, totalFlows);
+              updateProgress(jobId, progress, 100, `Guardian Agent: ${completedFlows}/${totalFlows} checklists`);
+            }
           },
           abortSignal: signal,
         });
 
-        securityChecklists = await guardianAgent.analyzeFlows(
-          flowProfiles,
-          framework,
-          projectTree
-        );
+        securityChecklists = await guardianAgent.analyzeFlows(flowProfiles, framework, projectTree);
 
-        addLog(jobId, "success", `   Guardian Agent generated ${securityChecklists.length} security checklists`);
+        updateProgress(jobId, PROGRESS.GUARDIAN.end, 100, `Guardian Agent: Complete (${securityChecklists.length} checklists)`);
         
-        // Log summary of security controls
-        let totalRequired = 0;
-        let totalRecommended = 0;
-        for (const checklist of securityChecklists) {
-          totalRequired += checklist.required_controls.length;
-          totalRecommended += checklist.recommended_controls.length;
-        }
-        addLog(jobId, "info", `   📋 Total: ${totalRequired} required controls, ${totalRecommended} recommended controls`);
+        const totalRequired = securityChecklists.reduce((sum, c) => sum + c.required_controls.length, 0);
+        const totalRecommended = securityChecklists.reduce((sum, c) => sum + c.recommended_controls.length, 0);
+        addLog(jobId, "success", `✓ Guardian Agent: ${securityChecklists.length} checklists (${totalRequired} required, ${totalRecommended} recommended controls)`);
       } catch (error) {
-        if (error instanceof CancellationError) {
-          throw error;
-        }
+        if (error instanceof CancellationError) throw error;
         const errorMsg = error instanceof Error ? error.message : "Unknown error";
-        addLog(jobId, "warn", `   ⚠️ Guardian Agent encountered an issue: ${errorMsg}`);
-        addLog(jobId, "info", "   Continuing with remaining analysis stages...");
+        addLog(jobId, "warn", `⚠️ Guardian Agent error: ${errorMsg}`);
       }
     } else {
-      addLog(jobId, "info", "⏭️ Skipping Guardian Agent (no endpoints found)");
+      updateProgress(jobId, PROGRESS.GUARDIAN.end, 100, "Guardian Agent: Skipped (no endpoints)");
+      addLog(jobId, "info", "⏭️ Guardian Agent: Skipped (no endpoints discovered)");
     }
 
-    // Stage 5: Inspector Agent - Security Report Generation
+    // Stage 3: Inspector Agent - Code Inspection
     checkCancellation(jobId, signal);
     let securityReports: SecurityReport[] = [];
     
     if (endpointProfiles.length > 0 && securityChecklists.length > 0) {
-      updateProgress(jobId, 50, 100, "Running Inspector Agent");
-      addLog(jobId, "info", "🕵️ Starting Inspector Agent for security inspection...");
+      updateProgress(jobId, PROGRESS.INSPECTOR.start, 100, "Inspector Agent: Inspecting code");
+      addLog(jobId, "info", "🕵️ Inspector Agent: Performing security inspection...");
       
       try {
-        // Match endpoints with their checklists
         const inspectionInputs: InspectionInput[] = [];
         for (const endpoint of endpointProfiles) {
-          const checklist = securityChecklists.find(
-            (c) => c.flow_name === endpoint.flow_name
-          );
+          const checklist = securityChecklists.find((c) => c.flow_name === endpoint.flow_name);
           if (checklist) {
             inspectionInputs.push({ endpoint, checklist });
           }
         }
 
         if (inspectionInputs.length > 0) {
+          const totalInspections = inspectionInputs.length;
+          let completedInspections = 0;
+
           const inspectorAgent = createInspectorAgent({
             saveDebugOutput: true,
             onLog: (message) => {
               addLog(jobId, "info", `   ${message}`);
+              // Track completed inspections
+              if (message.includes("Inspected") || message.includes("report for")) {
+                completedInspections++;
+                const progress = calcProgress(PROGRESS.INSPECTOR, completedInspections, totalInspections);
+                updateProgress(jobId, progress, 100, `Inspector Agent: ${completedInspections}/${totalInspections} inspected`);
+              }
             },
             abortSignal: signal,
           });
 
           securityReports = await inspectorAgent.inspectFlows(inspectionInputs);
 
-          addLog(jobId, "success", `   Inspector Agent generated ${securityReports.length} security reports`);
+          updateProgress(jobId, PROGRESS.INSPECTOR.end, 100, `Inspector Agent: Complete (${securityReports.length} reports)`);
           
-          // Log summary of findings
-          let totalImplemented = 0;
-          let totalMissing = 0;
-          let totalAutoHandled = 0;
-          let totalVulnerabilities = 0;
-          for (const report of securityReports) {
-            totalImplemented += report.implemented.length;
-            totalMissing += report.missing.length;
-            totalAutoHandled += report.auto_handled.length;
-            totalVulnerabilities += report.vulnerabilities?.length || 0;
-          }
-          addLog(jobId, "info", `   📊 Controls: ${totalImplemented} implemented, ${totalMissing} missing, ${totalAutoHandled} auto-handled`);
-          if (totalVulnerabilities > 0) {
-            addLog(jobId, "warn", `   🔴 Vulnerabilities found: ${totalVulnerabilities}`);
+          // Summary
+          const totalImplemented = securityReports.reduce((sum, r) => sum + r.implemented.length, 0);
+          const totalMissing = securityReports.reduce((sum, r) => sum + r.missing.length, 0);
+          const totalVulns = securityReports.reduce((sum, r) => sum + (r.vulnerabilities?.length || 0), 0);
+          
+          addLog(jobId, "success", `✓ Inspector Agent: ${totalImplemented} implemented, ${totalMissing} missing controls`);
+          
+          if (totalVulns > 0) {
+            addLog(jobId, "warn", `🔴 Found ${totalVulns} vulnerabilities`);
           }
           
-          // Log severity summary
           const criticalCount = securityReports.filter(r => r.summary.overall_severity === "critical").length;
           const highCount = securityReports.filter(r => r.summary.overall_severity === "high").length;
-          if (criticalCount > 0) {
-            addLog(jobId, "warn", `   🚨 ${criticalCount} endpoint(s) with critical severity issues`);
-          }
-          if (highCount > 0) {
-            addLog(jobId, "warn", `   ⚠️ ${highCount} endpoint(s) with high severity issues`);
-          }
-        } else {
-          addLog(jobId, "info", "   No matching endpoint-checklist pairs found");
+          if (criticalCount > 0) addLog(jobId, "warn", `🚨 ${criticalCount} endpoint(s) with critical severity`);
+          if (highCount > 0) addLog(jobId, "warn", `⚠️ ${highCount} endpoint(s) with high severity`);
         }
       } catch (error) {
-        if (error instanceof CancellationError) {
-          throw error;
-        }
+        if (error instanceof CancellationError) throw error;
         const errorMsg = error instanceof Error ? error.message : "Unknown error";
-        addLog(jobId, "warn", `   ⚠️ Inspector Agent encountered an issue: ${errorMsg}`);
-        addLog(jobId, "info", "   Continuing with remaining analysis stages...");
+        addLog(jobId, "warn", `⚠️ Inspector Agent error: ${errorMsg}`);
       }
     } else {
-      addLog(jobId, "info", "⏭️ Skipping Inspector Agent (no endpoints or checklists found)");
+      updateProgress(jobId, PROGRESS.INSPECTOR.end, 100, "Inspector Agent: Skipped");
+      addLog(jobId, "info", "⏭️ Inspector Agent: Skipped (no checklists available)");
     }
 
-    // Stage 6: Build dependency graph
+    // Finalize
     checkCancellation(jobId, signal);
-    updateProgress(jobId, 65, 100, "Building dependency graph");
-    addLog(jobId, "info", "🕸️ Building dependency graph...");
-    await delay(1000, signal);
-    addLog(jobId, "success", "   Dependency graph constructed");
-    await delay(300, signal);
-
-    // Stage 7: Analyze code patterns
-    checkCancellation(jobId, signal);
-    updateProgress(jobId, 75, 100, "Analyzing code patterns");
-    addLog(jobId, "info", "🔬 Analyzing code patterns...");
-    await delay(800, signal);
-
-    // Simulate analyzing some files
-    const filesToShow = files.slice(0, Math.min(5, files.length));
-    for (let i = 0; i < filesToShow.length; i++) {
-      checkCancellation(jobId, signal);
-      const file = filesToShow[i];
-      const progress = 50 + Math.floor((i / filesToShow.length) * 15);
-      updateProgress(jobId, progress, 100, `Analyzing ${file.path}`);
-      addLog(jobId, "info", `   Analyzing: ${file.path}`);
-      await delay(400, signal);
-    }
-
-    if (files.length > 5) {
-      addLog(jobId, "info", `   ... and ${files.length - 5} more files`);
-      await delay(300, signal);
-    }
-
-    // Stage 7: Security scan
-    checkCancellation(jobId, signal);
-    updateProgress(jobId, 80, 100, "Running security scan");
-    addLog(jobId, "info", "🔒 Running security scan...");
-    await delay(1200, signal);
-    addLog(jobId, "success", "   No critical vulnerabilities found");
-    await delay(200, signal);
-
-    // Stage 8: Code quality check
-    checkCancellation(jobId, signal);
-    updateProgress(jobId, 90, 100, "Checking code quality");
-    addLog(jobId, "info", "✨ Checking code quality...");
-    await delay(800, signal);
-
-    // Generate some dummy findings
-    const findings: AnalysisResult["findings"] = [];
-
-    if (files.length > 10) {
-      findings.push({
-        type: "suggestion",
-        severity: "info",
-        message: "Consider splitting large modules into smaller components",
-      });
-    }
-
-    if (framework.framework !== "unknown") {
-      findings.push({
-        type: "best-practice",
-        severity: "info",
-        message: `Following ${framework.framework} best practices detected`,
-      });
-    }
-
-    // Add a warning for demonstration
-    findings.push({
-      type: "code-smell",
-      severity: "warning",
-      message: "Some files could benefit from additional documentation",
-    });
-
-    for (const finding of findings) {
-      checkCancellation(jobId, signal);
-      const icon = finding.severity === "warning" ? "⚠️" : "ℹ️";
-      addLog(
-        jobId,
-        finding.severity === "warning" ? "warn" : "info",
-        `${icon} ${finding.message}`
-      );
-      await delay(300, signal);
-    }
-
-    // Stage 9: Generate report
-    checkCancellation(jobId, signal);
-    updateProgress(jobId, 95, 100, "Generating report");
-    addLog(jobId, "info", "📝 Generating analysis report...");
-    await delay(600, signal);
-
-    // Complete
     updateProgress(jobId, 100, 100, "Complete");
     
     const analysisTime = Date.now() - startTime;
-
-    // Calculate total issues from security reports (missing controls + vulnerabilities)
-    const totalMissingControls = securityReports.reduce(
-      (sum, report) => sum + report.missing.length,
-      0
-    );
-    const totalVulnerabilities = securityReports.reduce(
-      (sum, report) => sum + (report.vulnerabilities?.length || 0),
-      0
-    );
+    const totalMissingControls = securityReports.reduce((sum, r) => sum + r.missing.length, 0);
+    const totalVulnerabilities = securityReports.reduce((sum, r) => sum + (r.vulnerabilities?.length || 0), 0);
 
     const result: AnalysisResult = {
-      summary: `Analysis completed successfully for ${framework.framework} project with ${files.length} files.`,
-      findings,
+      summary: `Analysis completed for ${framework.framework} project with ${files.length} files.`,
+      findings: [],
       endpointProfiles,
       securityChecklists,
       securityReports,
@@ -386,16 +252,11 @@ export async function runAnalysis(
     };
 
     setResult(jobId, result);
-    addLog(
-      jobId,
-      "success",
-      `✅ Analysis completed in ${(analysisTime / 1000).toFixed(1)}s`
-    );
+    addLog(jobId, "success", `✅ Analysis completed in ${(analysisTime / 1000).toFixed(1)}s`);
     updateStatus(jobId, "completed");
 
   } catch (error) {
     if (error instanceof CancellationError) {
-      // Job was cancelled - status already updated by cancelJob
       return;
     }
     const errorMessage = error instanceof Error ? error.message : "Unknown error";

@@ -3,6 +3,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AnalysisResult } from "./types";
 import { formatDuration } from "./utils";
+import { FindingsChart } from "./FindingsChart";
+import { SecurityScore } from "./SecurityScore";
 
 interface ResultsCardProps {
   result: AnalysisResult;
@@ -64,6 +66,12 @@ export function ResultsCard({ result }: ResultsCardProps) {
             </p>
             <p className="text-sm text-zinc-500">Analysis Time</p>
           </div>
+        </div>
+
+        {/* Charts Section */}
+        <div className="grid gap-4 md:grid-cols-2">
+          <SecurityScore result={result} />
+          <FindingsChart result={result} />
         </div>
       </CardContent>
     </Card>
