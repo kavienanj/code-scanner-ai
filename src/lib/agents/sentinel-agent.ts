@@ -26,11 +26,24 @@ export const SENTINEL_MAX_SIMILAR_FILES = 5;
 /** System prompt for the Sentinel Agent */
 export const SENTINEL_SYSTEM_PROMPT = `You are the Sentinel Agent, an expert code analyst specializing in API endpoint security analysis.
 
-Your goal is to systematically trace API endpoints through a codebase, following the complete request flow from entry point to response, documenting all relevant code paths, dependencies, and security-relevant information.
+Your goal is to systematically trace API an endpoint through a codebase, following the complete request flow from entry point to response, documenting all relevant code paths, dependencies, and security-relevant information.
+
+When a file contains MULTIPLE endpoints, you must analyze them SEPARATELY unless they are CRUD operations for the SAME entity.
+
+**Group together (as one flow):**
+- GET /users, POST /users, PUT /users/:id, DELETE /users/:id → These are all CRUD for "User" entity
+- GET /products, POST /products, PATCH /products/:id → These are all CRUD for "Product" entity
+
+**Analyze separately (different flows):**
+- POST /auth/login and POST /users → Different purposes (auth vs user creation)
+- GET /orders and POST /payments → Different entities (orders vs payments)  
+- POST /upload and GET /analytics → Completely different features
+
+When you encounter a file with mixed endpoints pick ONE specific endpoint or one CRUD group for same entity
 
 ## Your Process:
 
-1. **Pick an endpoint**: When given a project structure, identify API endpoint files that haven't been analyzed yet.
+1. **Pick an endpoint**: When given a project structure, identify API entrypoint/route files and pick an endpoint.
 
 2. **Trace the endpoint**: Follow the code flow by requesting files one at a time:
    - Trace imports and dependencies
@@ -41,11 +54,16 @@ Your goal is to systematically trace API endpoints through a codebase, following
 
 3. **Complete the analysis**: When you have traced the complete flow, provide a comprehensive endpoint profile.
 
+**IMPORTANT**:
+Before returning {"status": "not_found"}, you MUST verify that you have checked ALL possible entry point files in the project.
+Multiple endpoints can be defined in the SAME file.
+If you're unsure, request to read a potential entry file again to check for additional endpoints.
+
 ## Response Format:
 
 You MUST respond with valid JSON in one of these formats:
 
-### When picking an endpoint to trace:
+### Pick a file to look for endpoint that hasn't been processed yet:
 \`\`\`json
 {
   "status": "pick_endpoint",
@@ -57,6 +75,7 @@ You MUST respond with valid JSON in one of these formats:
 \`\`\`json
 {
   "status": "tracing_endpoint",
+  "endpoint_being_traced": "POST /api/users",
   "file_to_read_next": "path/to/next/file.ts",
   "files_to_read_later": ["path/to/other/file.ts", "path/to/another/file.ts"]
 }
@@ -78,7 +97,7 @@ You MUST respond with valid JSON in one of these formats:
 }
 \`\`\`
 
-### When no more NEW endpoints to analyze OR you realize you're on an already-processed endpoint:
+### After checking all possible entry points and finding no new endpoints:
 \`\`\`json
 {
   "status": "not_found"
@@ -124,6 +143,7 @@ export interface SentinelPickEndpointResponse {
 
 export interface SentinelTracingEndpointResponse {
   status: "tracing_endpoint";
+  endpoint_being_traced: string;
   file_to_read_next: string;
   files_to_read_later: string[];
 }
@@ -197,7 +217,7 @@ async function saveDebugOutput(output: SentinelDebugOutput): Promise<string> {
 /**
  * Generate a tree structure of the project up to specified depth
  */
-function generateProjectTree(
+export function generateProjectTree(
   files: FileEntry[],
   maxDepth: number = SENTINEL_PROJECT_TREE_DEPTH
 ): string {
@@ -294,6 +314,9 @@ function parseAgentResponse(text: string): SentinelAgentResponse {
       case "tracing_endpoint":
         if (!parsed.file_to_read_next) {
           throw new Error("tracing_endpoint response missing 'file_to_read_next'");
+        }
+        if (!parsed.endpoint_being_traced) {
+          throw new Error("tracing_endpoint response missing 'endpoint_being_traced'");
         }
         return {
           ...parsed,
@@ -441,11 +464,10 @@ export class SentinelAgent {
         response = parseAgentResponse(text);
       } catch (error) {
         this.log(`⚠️ Failed to parse agent response: ${error}`);
-        // Ask agent to retry with proper format
-        conversationHistory.push({
-          role: "user",
-          content: "Please respond with valid JSON in the expected format.",
-        });
+        // retry the last step by continuing the loop
+        // reset depth and conversation to last user message
+        depth--;
+        conversationHistory = conversationHistory.slice(0, -1);
         continue;
       }
 
@@ -482,7 +504,8 @@ export class SentinelAgent {
           break;
 
         case "tracing_endpoint":
-          this.log(`🔄 Tracing: ${response.file_to_read_next}`);
+          currentEndpointName = response.endpoint_being_traced;
+          this.log(`🔄 Tracing ${response.endpoint_being_traced}: ${response.file_to_read_next}`);
           // Add files to read later to the queue
           if (response.files_to_read_later?.length) {
             filesToRead.push(...response.files_to_read_later.filter(f => !filesRead.has(f)));

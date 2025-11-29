@@ -29,6 +29,8 @@ interface AnalysisResult {
   }>;
   metrics: {
     filesAnalyzed: number;
+    endpointsFound: number;
+    securityChecklistsGenerated: number;
     issuesFound: number;
     analysisTime: number;
   };
@@ -296,12 +298,24 @@ export default function TaskPage() {
             </CardHeader>
             <CardContent>
               {/* Metrics */}
-              <div className="mb-6 grid grid-cols-3 gap-4">
+              <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
                 <div className="rounded-lg bg-white p-4 dark:bg-zinc-900">
                   <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
                     {result.metrics.filesAnalyzed}
                   </p>
                   <p className="text-sm text-zinc-500">Files Analyzed</p>
+                </div>
+                <div className="rounded-lg bg-white p-4 dark:bg-zinc-900">
+                  <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
+                    {result.metrics.endpointsFound}
+                  </p>
+                  <p className="text-sm text-zinc-500">Endpoints Found</p>
+                </div>
+                <div className="rounded-lg bg-white p-4 dark:bg-zinc-900">
+                  <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
+                    {result.metrics.securityChecklistsGenerated}
+                  </p>
+                  <p className="text-sm text-zinc-500">Security Checklists</p>
                 </div>
                 <div className="rounded-lg bg-white p-4 dark:bg-zinc-900">
                   <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
