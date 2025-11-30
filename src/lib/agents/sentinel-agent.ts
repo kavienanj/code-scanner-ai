@@ -526,6 +526,14 @@ export class SentinelAgent {
               await this.readFileAndRespond(files, nextFile, filesRead, conversationHistory);
             }
           }
+
+          // If max depth about to be reached, inform the agent
+          if (depth + 1 >= this.maxDepth) {
+            conversationHistory.push({
+              role: "user",
+              content: `⚠️ You have reached the maximum analysis depth of ${this.maxDepth}. Please complete the endpoint analysis in the next response.`,
+            });
+          }
           break;
 
         case "completed":
