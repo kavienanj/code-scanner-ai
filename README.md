@@ -8,6 +8,8 @@ An intelligent security analysis tool that uses a multi-agent AI system to scan 
 ![AI Powered](https://img.shields.io/badge/AI-Claude%20%7C%20GPT-purple)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
+![Code Scanner Design](assets/CodeScannerDesign.png)
+
 ## Features
 
 - 🔍 **Multi-Agent Analysis** - Three specialized AI agents work together to provide comprehensive security analysis
