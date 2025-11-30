@@ -261,7 +261,7 @@ Raw analysis outputs are saved to `/output/` for debugging:
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `DEFAULT_MODEL` | AI model to use (e.g., `claude-opus-4-5-20251101`, `gpt-4o`) | Yes |
+| `DEFAULT_MODEL` | AI model to use | Yes |
 | `OPENAI_API_KEY` | OpenAI API key | If using GPT models |
 | `ANTHROPIC_API_KEY` | Anthropic API key | If using Claude models |
 | `PAT_TOKEN` | GitHub Personal Access Token | For private repos |
@@ -269,7 +269,7 @@ Raw analysis outputs are saved to `/output/` for debugging:
 ### Supported Models
 
 - **Anthropic**: `claude-opus-4-5-20251101`, `claude-sonnet-4-20250514`
-- **OpenAI**: `gpt-4o`, `gpt-4-turbo`, `gpt-4`
+- **OpenAI**: `gpt-5.1-2025-11-13`, `gpt-5-pro-2025-10-06`
 
 ---
 
@@ -305,6 +305,7 @@ src/
     │   ├── guardian-agent # Checklist generation
     │   └── inspector-agent# Code inspection
     ├── code-cleaner/      # Preprocessing
+    ├── generate-text.ts   # AI text generation
     ├── analysis-runner.ts # Orchestration
     └── job-store.ts       # Job state management
 ```
