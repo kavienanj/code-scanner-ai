@@ -1,3 +1,6 @@
+// Common exports
+export { DEFAULT_MODEL } from "../generate-text";
+
 // Sentinel Agent exports
 export {
   // Agent class and factory
@@ -6,7 +9,6 @@ export {
   // Helper functions
   generateProjectTree,
   // Configuration constants
-  SENTINEL_DEFAULT_MODEL,
   SENTINEL_DEFAULT_MAX_DEPTH,
   SENTINEL_PROJECT_TREE_DEPTH,
   SENTINEL_MAX_SIMILAR_FILES,
@@ -29,7 +31,6 @@ export {
   GuardianAgent,
   createGuardianAgent,
   // Configuration constants
-  GUARDIAN_DEFAULT_MODEL,
   GUARDIAN_MAX_RETRIES,
   GUARDIAN_SYSTEM_PROMPT,
   GUARDIAN_OUTPUT_DIR,
@@ -53,7 +54,6 @@ export {
   InspectorAgent,
   createInspectorAgent,
   // Configuration constants
-  INSPECTOR_DEFAULT_MODEL,
   INSPECTOR_MAX_RETRIES,
   INSPECTOR_SYSTEM_PROMPT,
   INSPECTOR_OUTPUT_DIR,

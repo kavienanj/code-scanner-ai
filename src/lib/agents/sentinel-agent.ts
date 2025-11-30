@@ -1,6 +1,4 @@
-import { openai } from "@ai-sdk/openai";
-import { anthropic } from '@ai-sdk/anthropic';
-import { generateText } from "ai";
+import { generateText, DEFAULT_MODEL } from "../generate-text";
 import { FileEntry } from "../code-cleaner";
 import { promises as fs } from "fs";
 import path from "path";
@@ -11,9 +9,6 @@ import path from "path";
 
 /** Output directory for debug JSON files */
 export const SENTINEL_OUTPUT_DIR = path.join(process.cwd(), "output", "sentinel-agent");
-
-/** Default model to use for the Sentinel Agent */
-export const SENTINEL_DEFAULT_MODEL = process.env.DEFAULT_MODEL || "claude-opus-4-5-20251101";
 
 /** Maximum depth for tracing a single endpoint (number of LLM calls) */
 export const SENTINEL_DEFAULT_MAX_DEPTH = 10;
@@ -121,7 +116,8 @@ The mark_down field should include:
 6. Data flow (input → processing → output)
 7. External service calls and database operations
 
-Be thorough but concise. Focus on security-relevant aspects.`;
+Be thorough but concise. Focus on security-relevant aspects.
+Your responses MUST be a valid JSON as specified above.`;
 
 // ============================================================================
 // Types
@@ -357,7 +353,7 @@ export class SentinelAgent {
   private tracingHistory: SentinelDebugOutput["tracingHistory"] = [];
 
   constructor(options: SentinelAgentOptions = {}) {
-    this.model = options.model || SENTINEL_DEFAULT_MODEL;
+    this.model = options.model || DEFAULT_MODEL;
     this.maxDepth = options.maxDepth || SENTINEL_DEFAULT_MAX_DEPTH;
     this.log = options.onLog || console.log;
     this.abortSignal = options.abortSignal;
@@ -451,9 +447,7 @@ export class SentinelAgent {
 
       // Generate response from the agent
       const { text } = await generateText({
-        model: this.model.startsWith("claude-") 
-            ? anthropic(this.model)
-            : openai(this.model),
+        model: this.model,
         system: SENTINEL_SYSTEM_PROMPT,
         messages: conversationHistory,
         abortSignal: this.abortSignal,

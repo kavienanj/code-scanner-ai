@@ -1,6 +1,4 @@
-import { openai } from "@ai-sdk/openai";
-import { anthropic } from '@ai-sdk/anthropic';
-import { generateText } from "ai";
+import { generateText, DEFAULT_MODEL } from "../generate-text";
 import { promises as fs } from "fs";
 import path from "path";
 import { FrameworkDetectionResult } from "../code-cleaner";
@@ -11,9 +9,6 @@ import { FrameworkDetectionResult } from "../code-cleaner";
 
 /** Output directory for debug JSON files */
 export const GUARDIAN_OUTPUT_DIR = path.join(process.cwd(), "output", "guardian-agent");
-
-/** Default model to use for the Guardian Agent */
-export const GUARDIAN_DEFAULT_MODEL = process.env.DEFAULT_MODEL || "claude-opus-4-5-20251101"; // "gpt-5.1-2025-11-13";
 
 /** Maximum retries for parsing agent response */
 export const GUARDIAN_MAX_RETRIES = 3;
@@ -342,7 +337,7 @@ export class GuardianAgent {
   private analysisHistory: GuardianDebugOutput["analysisHistory"] = [];
 
   constructor(options: GuardianAgentOptions = {}) {
-    this.model = options.model || GUARDIAN_DEFAULT_MODEL;
+    this.model = options.model || DEFAULT_MODEL;
     this.maxRetries = options.maxRetries || GUARDIAN_MAX_RETRIES;
     this.log = options.onLog || console.log;
     this.abortSignal = options.abortSignal;
@@ -435,9 +430,7 @@ export class GuardianAgent {
       try {
         // Generate response from the agent
         const { text } = await generateText({
-          model: this.model.startsWith("claude-") 
-            ? anthropic(this.model)
-            : openai(this.model),
+          model: this.model,
           system: GUARDIAN_SYSTEM_PROMPT,
           messages: conversationHistory,
           abortSignal: this.abortSignal,
