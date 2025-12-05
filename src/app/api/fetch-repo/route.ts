@@ -38,7 +38,8 @@ function parseGitHubUrl(url: string): RepoInfo | null {
     
     const urlObj = new URL(cleanUrl);
     
-    if (!urlObj.hostname.includes("github.com")) {
+    const allowedHosts = ["github.com", "www.github.com"];
+    if (!allowedHosts.includes(urlObj.hostname)) {
       return null;
     }
     
