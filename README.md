@@ -62,9 +62,6 @@ DEFAULT_MODEL=claude-opus-4-5-20251101
 # API Keys (at least one required)
 OPENAI_API_KEY=sk-your-openai-key
 ANTHROPIC_API_KEY=sk-ant-your-anthropic-key
-
-# Optional: GitHub token for private repos
-PAT_TOKEN=github_pat_your-token
 ```
 
 ### Running the Application
@@ -98,7 +95,7 @@ Upload a ZIP archive containing your project source code directly through the we
 
 Provide a GitHub repository URL to fetch and analyze the codebase.
 
-- **Supported**: Public repositories (private repos with PAT_TOKEN)
+- **Supported**: Public repositories (private repos with pat token)
 - **Format**: `https://github.com/owner/repo` or `https://github.com/owner/repo/tree/branch`
 - **Best for**: Open source projects, quick scans
 
@@ -264,7 +261,6 @@ Raw analysis outputs are saved to `/output/` for debugging:
 | `DEFAULT_MODEL` | AI model to use | Yes |
 | `OPENAI_API_KEY` | OpenAI API key | If using GPT models |
 | `ANTHROPIC_API_KEY` | Anthropic API key | If using Claude models |
-| `PAT_TOKEN` | GitHub Personal Access Token | For private repos |
 
 ### Supported Models
 
