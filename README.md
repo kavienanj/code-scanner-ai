@@ -8,6 +8,10 @@ An intelligent security analysis tool that uses a multi-agent AI system to scan 
 ![AI Powered](https://img.shields.io/badge/AI-Claude%20%7C%20GPT-purple)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
+## 🎬 Demo
+
+Watch the demo video: [Code Scanner AI Demo](https://drive.google.com/file/d/1hTy0q5TNar47Au9ziIetiwR45TxnLEWV/view?usp=sharing)
+
 ![Code Scanner Design](assets/CodeScannerDesign.png)
 
 ## Features
